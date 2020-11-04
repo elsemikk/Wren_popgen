@@ -1,0 +1,66 @@
+
+Using the parameter settings in the file: 
+''K2wrens.paramfile''
+
+Parameter settings
+----------------------- Main parameters -------------------------
+DATATYPE = 0
+INDFILE = K2wrens.indfile
+POPFILE = 
+OUTFILE = K2wrens.outfile
+MISCFILE = K2wrens.miscfile
+K = 2
+C = 75
+R = 10
+M = 1
+W = 1
+S = 2
+- Additional options for the Greedy and LargeKGreedy algorithms -
+GREEDY_OPTION = 
+REPEATS = 
+PERMUTATIONFILE = 
+----------------------- Optional outputs ------------------------
+PRINT_PERMUTED_DATA = 1
+PERMUTED_DATAFILE = arabid.perm_datafile
+PRINT_EVERY_PERM = 0
+EVERY_PERMFILE = 
+PRINT_RANDOM_INPUTORDER = 
+RANDOM_INPUTORDERFILE = 
+----------------------- Advanced options ------------------------
+OVERRIDE_WARNINGS = 0
+ORDER_BY_RUN = 1
+
+
+In total, 512 configurations of runs and clusters will be tested.
+
+Results
+------------------------------
+The highest value of H' is: 0.99994611397488
+
+The list of permutations of the clusters that produces that
+H' value is (runs are listed sequentially on separate rows)
+
+1 2 
+2 1 
+1 2 
+1 2 
+2 1 
+2 1 
+2 1 
+2 1 
+2 1 
+2 1 
+
+The pairwise G' values for each pair of runs where the clusters
+of each run are permuted according to the list of permutations above
+
+1.0000 0.9999 0.9999 0.9999 0.9999 0.9999 1.0000 0.9999 0.9999 1.0000 
+0.9999 1.0000 1.0000 1.0000 1.0000 1.0000 0.9999 1.0000 1.0000 0.9999 
+0.9999 1.0000 1.0000 1.0000 1.0000 1.0000 0.9999 1.0000 1.0000 0.9999 
+0.9999 1.0000 1.0000 1.0000 1.0000 1.0000 0.9999 1.0000 1.0000 0.9999 
+0.9999 1.0000 1.0000 1.0000 1.0000 1.0000 0.9999 1.0000 1.0000 0.9999 
+0.9999 1.0000 1.0000 1.0000 1.0000 1.0000 0.9999 1.0000 1.0000 0.9999 
+1.0000 0.9999 0.9999 0.9999 0.9999 0.9999 1.0000 0.9999 0.9999 1.0000 
+0.9999 1.0000 1.0000 1.0000 1.0000 1.0000 0.9999 1.0000 1.0000 0.9999 
+0.9999 1.0000 1.0000 1.0000 1.0000 1.0000 0.9999 1.0000 1.0000 0.9999 
+1.0000 0.9999 0.9999 0.9999 0.9999 0.9999 1.0000 0.9999 0.9999 1.0000 

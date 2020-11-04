@@ -1,0 +1,5 @@
+The phylogenetic network was produced using the SNP data concatenated for all autosomes, with all samples including the Marsh Wren.
+
+The `.nex` data matrix used for SplitsTree is provided in the folder `4_SplitsTree`. It can be openned in SplitsTree, which should automatically produce a phylogenetic network in a few seconds. The sample #64 labelled "MAWR" is the outgroup, which can be used to root the phylogenetic network. To set this sample as the outgroup, do: `Edit->Select Nodes-> click on the MAWR node of the tree -> Data -> Set Outgroup`. Then, a rooted equal angle tree can be produced: `Apply Rooted EqualAngle Method -> Apply`. 
+
+SplitsTree also produces a distance matrix for all samples; this matrix is also provided in the `4_SplitsTree` folder. This matrix was used to compare the average distances within and amongst the taxa. Samples are placed in rows and columns in the same order as the `.nex` file.
