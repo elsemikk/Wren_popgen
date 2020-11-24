@@ -1,12 +1,16 @@
-This page details the bioinformatics pipeline used to obtain the genotype dataset from the raw GBS sequencing data. This includes demultiplexing and trimming the sequences, mapping to the reference genome, calling genotypes, and filtering the SNP dataset.
+# Processing sequencing data
 
-**Input:**: raw `.fastq` files with sequencing data for all individuals
+This page details the bioinformatics pipeline used to obtain the genotype dataset from the raw GBS sequencing data. This includes demultiplexing and trimming the sequences, mapping to the reference genome, calling genotypes, and filtering the SNP dataset.  
+
+**Input**: raw `.fastq` files with sequencing data for all individuals  
 **Output**: `*.012NA`, `*.indv`, and `*.pos` files containing the genotype data for all samples
 
 # Step 1: Demultiplex the data
 
-The starting data are raw fastq files. First, the data was demultiplexed using the perl script `GBS_demultiplexer_30base.pl` (the code for this script is at the bottom of this page). This uses a text file (`extras/barcodes_PAWR_WIWR.txt` which lists two columns: the first lists the sample names, and the second lists the barcode sequence for that sample.
+The starting data are raw fastq files.  
+First, the data was demultiplexed using the perl script `GBS_demultiplexer_30base.pl` (the code for this script is at the bottom of this page). This requires as input a text file (`extras/barcodes_PAWR_WIWR.txt` which lists two columns: the first lists the sample names, and the second lists the barcode sequence for that sample.
 
+Here is the code to run the demultiplexing step:  
 ```bash
 #### 26 January 2017
 # Starting the analysis of PAWR / WIWR GBS sequencing reads, from library prepared by Else Mikkelsen
@@ -113,7 +117,7 @@ GE14D01	ACTCCACG
 
 
 perl tools/GBS_demultiplexer_30base.pl extras/barcodes_PAWR_WIWR.txt HI.4503.006.pawr_wiwr_EM1_R1.fastq HI.4503.006.pawr_wiwr_EM1_R2.fastq clean_data/PAWR_WIWR
-# started 4:54pm. Seems to be working.
+# started 4:54pm.
 # finished 6:40pm. Produced file sizes (R1 and R2 separately) ranging from about 420-1200 GB (except for one individual that produced very little: PAWR_WIWR_EE10D01)
 ```
 
@@ -218,7 +222,7 @@ PAWR_WIWR_GE14D01
 
 ## Run the shell script trim.sh
 
-Trimmomatic is in the tools folder.
+Now, with the list of samples, we can run trimmomatic using a shell script. The script is written with Trimmomatic installed in the working directory in a directory called `tools`, this path would need to be modified to run in any other setup.
 
 ```bash
 mkdir clean_data_trim
@@ -236,7 +240,7 @@ while read prefix
 
 do
 
-java -jar tools/Trimmomatic-0.32/trimmomatic-0.32.jar PE -phred33 -threads 1 clean_data/"$prefix"_R1.fastq clean_data/"$prefix"_R2.fastq clean_data_trim/"$prefix"_R1.fastq clean_data_trim/"$prefix"_R1_unpaired.fastq clean_data_trim/"$prefix"_R2.fastq clean_data_trim/"$prefix"_R2_unpaired.fastq TRAILING:3 SLIDINGWINDOW:4:10 MINLEN:30
+java -jar ./tools/Trimmomatic-0.32/trimmomatic-0.32.jar PE -phred33 -threads 1 clean_data/"$prefix"_R1.fastq clean_data/"$prefix"_R2.fastq clean_data_trim/"$prefix"_R1.fastq clean_data_trim/"$prefix"_R1_unpaired.fastq clean_data_trim/"$prefix"_R2.fastq clean_data_trim/"$prefix"_R2_unpaired.fastq TRAILING:3 SLIDINGWINDOW:4:10 MINLEN:30
 
 done < extras/prefix.list.PAWR_WIWR.txt
 ```
@@ -256,6 +260,7 @@ chmod 755 trim.sh
 
 After trimming, we mapped the sequences to the Ficedula reference genome, using bwa mem v0.7.17, picard-tools-1.97, and samtools-1.7
 
+Here are instructions to install bwa and samtools:
 ```bash
 # Getting ready for mapping step:
 
