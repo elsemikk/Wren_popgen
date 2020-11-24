@@ -1,6 +1,8 @@
-This file contains the code which was used to produce the PCA figures shown in the manuscript as well as other exploratory PCA figures.
+# PCA Plotting
 
-**Input**: `*.012NA`, `*.indv`, and `*.pos` files containing the genotype data for all samples ,produced in the first step. These files are provided in the folder `2_PCA_DATA` in this repository. It also requires metadata files which are provided in the same folder. This R code also uses functions that are provided in the R script `genomics_R_functions.R`.
+This file contains the code which was used to produce the PCA figures shown in the manuscript.
+
+**Input**: `*.012NA`, `*.indv`, and `*.pos` files containing the genotype data for all samples ,produced in the first step. These files are provided in the folder `PAWR_WIWR_012NA_files` in this repository. This R code also uses functions that are provided in the R script `genomics_R_functions.R`, which is provided in this repository in the folder `2_PCA_data`. It also requires metadata files, which are provided in the folder `2_PCA_DATA` in this repository.
 
 **Output:**: PCA figures and PCA data
 
@@ -8,11 +10,11 @@ Note that the R code provided here will require a few changes before it can be r
 
 # PCA of whole genome data
 
-First, here is the code used to produce a PCA of the whole genome data with all samples. It uses functions that are contaied in the file `genomics_R_functions.R`.
+First, here is the code used to produce a PCA of the whole genome data with all samples. It uses functions that are contained in the file `genomics_R_functions.R`, which is provided in this repository in the folder `2_PCA_data`.
 
 This dataset uses only variable sites, with singletons removed (as these will not be useful for PCA of relationships between samples).
 
-Note that this code has several lines which are not used to generate the PCA plots, but contain options used for other analyses. 
+Note that this code has several lines which are not used to generate the PCA plots, but contain options used for other figures/analyses. 
 
 ```R
 #here is the script I will use for the whole genome PCA
@@ -36,7 +38,7 @@ source ("~/Desktop/Wrens/pawr_wiwr_genomics/PAWR_WIWR_genomics_Rproject/genomics
 #this is a PCA using a dataset of SNPs with singletons removed, with all chromosomes except for the sex chromosomes
 
 # choose the chromosomes to analyze in this run
-chromosomes.to.analyze <- c("autoinfSNP")  
+chromosomes.to.analyze <- c("autoinfSNP")  #autoinfSNP is a dataset containing all autsomes concatenated together, with only "informative" sites (no invariant sites)
 
 Analysis_set <- 1  # 1: all samples, only SNPs;    2: all samples, with invariant sites
 
@@ -258,25 +260,23 @@ for (i in 1:length(chromosomes.to.analyze)) {
 # End main loop ----
 
 
-###This section performs another PCA plot for pacificus vs WIWR PCA#####
+###This section performs a PCA plot for pacificus and hiemalis#####
 ## Make PCA plot ----
 # choose only loci that are variable in the dataset (SNPs), and (optionally) above an Fst threshhold
 # groups and colors determined in Intro section, under groups.to.plot.PCA and group.colors.PCA
-Fst.filter <- F
+Fst.filter <- F #F turns off the Fst filter
 Fst.cutoff <- 0.01
 # choose whether to filter by Fst between pair of populations, or by Fst_among (as defined above)
 groups.to.compare <- "Fst_among"
 #groups.to.compare <- "nigrifrons_auduboni"
 axes <- 3
 
+#select the colours to plot each population
 groups.to.plot.PCA <- c("PAWR", "WIWR", "Hybrid")
 group.colors.PCA <- c("blue", "red", "purple")
 
-PCA_results <- plotPCA(Fst.filter, Fst.cutoff, groups.to.compare, WC84_Fst, combo.NApass, num_loc_cols, region.text,
-                       groups.to.plot.PCA, group.colors.PCA, axes, flip1=F, flip2=F)
-
-quartz()
-plot(PCA_results$scores[,1], PCA_results$scores[,2],  asp=1, pch=23, cex=2, xlab="PC1", ylab="PC3")
+#store the PCA results into a variable
+PCA_results <- plotPCA(Fst.filter, Fst.cutoff, groups.to.compare, WC84_Fst, combo.NApass, num_loc_cols, region.text, groups.to.plot.PCA, group.colors.PCA, axes, flip1=F, flip2=F)
 
 # PCA_results is a list containing var_explained, scores, and data 
 PCA_results$var_explained
@@ -284,12 +284,11 @@ PCA_results$var_explained
 #to check PC3
 #quartz()
 #plot(PCA_results$scores[,1], PCA_results$scores[,3],  asp=1, pch=23, cex=2, xlab="PC1", ylab="PC3")
-#plot(PCA_results$scores[,3], PCA_results$scores[,1], pch=23, cex=2, xlab="PC3", ylab="PC1", col=)
 ```
 
 # PCA of T. pacificus samples
 
-Next, here is the code for making the figure of PCA for T. pacificus. The goal was to determine if the samples from the range of T. p. salebrosus can be distinguished from the T. p. pacificus samples.
+Next, here is the code for making the figure of PCA for *T. pacificus* without *T. hiemalis*. The goal was to determine if the samples from the range of *T. p. salebrosus* can be distinguished from the *T. p. pacificus* samples.
 
 ```R
 #here is the script I will use for the whole genome PCA
@@ -560,19 +559,15 @@ PCA_results$scores[,1:3]
 #to check PC3
 #quartz()
 #plot(PCA_results$scores[,1], PCA_results$scores[,3],  asp=1, pch=23, cex=2, xlab="PC1", ylab="PC3")
-#plot(PCA_results$scores[,3], PCA_results$scores[,1], pch=23, cex=2, xlab="PC3", ylab="PC1", col=)
 ```
 
 # PCA of *T. hiemalis* samples
 
-The goal is to determine whether there is any genetic structure amongst the T. hiemalis samples: particularly, whether the eastern samples will cluster apart from the western samples. One complication is that three eastern samples are female, and no western samples are female. Including any sex-linked markers would be a problem, as it could introduce a false signal of differentiation between the eastern and western samples. Because of this, it is important to remove the W-linked region mapping to chromosome 8. To be conservative, this script excluded the entirety of chromosome 8. This makes it possible to distinguish population structure from sex differences.
+The goal is to determine whether there is any genetic structure amongst the *T. hiemalis* samples: particularly, whether the eastern samples will cluster apart from the western samples. One complication is that three eastern samples are female, and no western samples are female. Including any sex-linked markers would be a problem, as it could introduce a false signal of differentiation between the eastern and western samples. Because of this, it is important to remove the W-linked region mapping to chromosome 8. To be conservative, this script excluded the entirety of chromosome 8. This makes it possible to distinguish population structure from sex differences.
 
-
-To PCA on the hiemalis individuals, it is necessary to have a datafile that has no columns of entirely missing data in the hiemalis samples. This was not a problem with the pacificus analysis, as no columns were completely missing for pacificus. This was made by removing all pacificus (and the hybrids) from the dataset, and then removing all invariant loci, and making new 012NA files from this dataset.
+To run PCA on the *hiemalis* individuals, it is necessary to have a datafile that has no columns of entirely missing data. This was not a problem with the *pacificus* analysis, as no columns were completely missing for all *pacificus* samples. Unfortunately, there was at least one locus that was missing in all *hiemalis* samples. A new dataset was made by removing all *pacificus* (and the two hybrids) from the dataset, and then removing all invariant loci, and making new 012NA files from this dataset. This dataset is provided with the other 012NA files.
 
 ```R
-#here is the script I will use for the whole genome PCA
-
 # Introduction ----
 # PAWR_WIWR_GBS_R_analysis_script.R
 # Started by Darren Irwin on 5 Feb 2018.
