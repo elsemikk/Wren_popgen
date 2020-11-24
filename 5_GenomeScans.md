@@ -6,3 +6,397 @@ This file details the pipeline used to perform genome scans of Fst, pi_within, a
 
 **Output**: estimates of Fst, pi_within, and pi_between, for windows across the genome.
 
+# Main loop
+
+The first step of this script runs through the data to calculate Fst, pi, and Dxy (pi_between). This takes a very long time to run, and so alternately, the data can be pre-loaded using the WindowStats_from_R.R files (the path to these files will need to be modified for the script to run on a different machine). The path to the working directory will need to be modified, as well as the path to the `Genomics_R_Functions.R` script
+
+This script is set to pre-load the data using the line `calculate_or_load_stats <- 3`, this can be changed to re-calculate the stats from the data.
+
+Once complete, this portion will create quick rolling mean plots for each chromosome seperately for inspection.
+
+```R
+# Introduction ----
+# PAWR_WIWR_GBS_R_analysis_script.R
+# Started by Darren Irwin on 5 Feb 2018.
+# Based on R code written for Greenish Warbler analysis, and then the NA warbler analyses.
+
+# Initial setup ----
+
+# set directory where files stored
+setwd("~/Desktop/Wrens/pawr_wiwr_genomics")
+
+# Load functions
+source ("~/Desktop/Wrens/pawr_wiwr_genomics/PAWR_WIWR_genomics_Rproject/Genomics_R_Functions_changeddxytopib.R")
+
+# choose the chromosomes to analyze in this run
+#chromosomes.to.analyze <- c("24", "25", "26")  ### I have put just an example of a set of chromosomes here--I have already run these through the main loop below. 
+#### To do them all at once (which would take a long time), use this line:
+chromosomes.to.analyze <- c("1", "1A", "2", "3","4","4A", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15","17","18","19","20","21","22","23","24","25","26","27","28","Z")
+
+
+Analysis_set <- 2  # 1: all samples, only SNPs;    2: all samples, with invariant sites
+
+if (Analysis_set == 1) {
+  # choose path and filename for the 012NA files
+  base.name <- "PAWR_WIWR_012NA_files/PAWR_WIWR.genotypes.SNPs_only"
+  filename.text.middle <- ".max2allele_noindel.maxmiss"
+  # indicate percent threshold for missing genotypes for each SNP--
+  # this was set by earlier filtering, and is just a record-keeper for the filenames:
+  missing.genotype.threshold <- 30 
+  filename.text.end <-".MQ20.lowHet.tab"
+  tag.name <- ".all_samples."   # choose a tag name for this analysis
+  # indicate name of metadata file, a text file with these column headings:
+  # ID	location	group	Fst_group	plot_order
+  metadata.file <- "PAWRWIWR_Metadata.txt"  # Note the first line in this file corrects an error: AD29A07 should be ED29A07
+  num.individuals <- 77  # specify number of individuals in file (good for error checking)
+  # specify window size (number of bp with info) and step size
+  window_size <- 1000
+  step_size <- window_size  # could change if wanting overlapping windows
+  # specify groups for calculation of statistics
+  groups <- c("PAWR", "WIWR", "Hybrid", "MAWR")
+  group.colors <- c("blue", "red", "purple", "grey")
+  #groups <- c("PAWR", "WIWR", "Hybrid")
+  #group.colors <- c("blue", "red", "grey")
+  group_count <- length(groups)
+  
+  
+  # specify groups for plotting, and their colors
+  groups.to.plot.WC84_Fst <- c("PAWR_WIWR", "PAWR_Hybrid", "WIWR_Hybrid")
+  group.colors.WC84_Fst <- c("purple", "blue", "red")
+  groups.to.plot.Dxy <- groups.to.plot.WC84_Fst   # or specify differences if necessary
+  group.colors.Dxy <- group.colors.WC84_Fst  # or specify differences if necessary
+  groups.to.plot.pi <- c("PAWR", "WIWR", "Hybrid")
+  group.colors.pi <- c("blue", "red", "grey")
+  
+} else if (Analysis_set == 2) {
+  # choose path and filename for the 012NA files
+  base.name <- "PAWR_WIWR_012NA_files/PAWR_WIWR.genotypes.allSites"
+  filename.text.middle <- ".infoSites.max2allele_noindel.maxmiss"
+  # indicate percent threshold for missing genotypes for each SNP--
+  # this was set by earlier filtering, and is just a record-keeper for the filenames:
+  missing.genotype.threshold <- 30 
+  filename.text.end <-".MQ20.lowHet.tab"
+  tag.name <- ".all_samples_with_invariant_fixingpichangedxy."   # choose a tag name for this analysis
+  # indicate name of metadata file, a text file with these column headings:
+  # ID	location	group	Fst_group	plot_order
+  metadata.file <- "PAWRWIWR_Metadata.txt"  # Note the first line in this file corrects an error: AD29A07 should be ED29A07
+  num.individuals <- 77  # specify number of individuals in file (good for error checking)
+  # specify window size (number of bp with info) and step size
+  window_size <- 10000
+  step_size <- window_size  # could change if wanting overlapping windows
+  # specify groups for calculation of statistics
+  groups <- c("PAWR", "WIWR", "Hybrid", "MAWR")
+  group.colors <- c("blue", "red", "purple", "grey")
+  #groups <- c("PAWR", "WIWR", "Hybrid")
+  #group.colors <- c("blue", "red", "grey")
+  group_count <- length(groups)
+  
+  
+  # specify groups for plotting, and their colors
+  groups.to.plot.WC84_Fst <- c("PAWR_WIWR", "PAWR_Hybrid", "WIWR_Hybrid", "PAWR_MAWR", "WIWR_MAWR")
+  #groups.to.plot.WC84_Fst <- c("PAWR_WIWR", "PAWR_Hybrid", "PAWR_MAWR")
+  group.colors.WC84_Fst <- c("purple", "blue", "red", "grey", "orange")
+  groups.to.plot.Dxy <- groups.to.plot.WC84_Fst   # or specify differences if necessary
+  group.colors.Dxy <- group.colors.WC84_Fst  # or specify differences if necessary
+  groups.to.plot.pi <- c("PAWR", "WIWR", "Hybrid", "MAWR")
+  group.colors.pi <- c("blue", "red", "purple", "grey")
+  
+}
+
+
+# Option to focus on a region of chromosome ----
+focus.region <- F  # choose T for a subset of the chromosome, F for the whole thing)
+if (focus.region==T){
+  position.min <-  1500000
+  position.max <- 1750000
+}
+
+calculate_or_load_stats <- 3  # 1) calculate site stats;  
+# 2) load previously calculated per-site stats; 
+# 3) load per-site and windowed data from file
+
+# Option to save the per-site stats
+saveSiteInfo <- F # TRUE     # TRUE   # If TRUE, will save a file for per-site stats
+
+saveWindowedStats <- F # TRUE     #TRUE   # If TRUE, will save a file for per-window stats
+
+load.rolling.means <- T   #FALSE     #   FALSE    # If TRUE, will load rolling mean data (rather than calculate)
+
+locations <- read.table(paste0(metadata.file), sep = "\t", header=TRUE)
+num_loc_cols <- length(locations[1,])
+
+
+# MAIN LOOP ----
+# -----
+for (i in 1:length(chromosomes.to.analyze)) {
+  chr <- chromosomes.to.analyze[i] 
+  
+  # Get chr data ---- 
+  # read in position data for this chromosome
+  position.file.name <- paste0(base.name, ".chr", chr, filename.text.middle, missing.genotype.threshold, filename.text.end, ".012.pos")
+  pos.whole.chr <- read.table(position.file.name, col.names = c("chrom", "position"))
+  # read in genotype data for this chromosome
+  column_names <- c("null", paste("c", pos.whole.chr$chrom, pos.whole.chr$position, sep="."))
+  genotype.file.name <- paste0(base.name, ".chr", chr, filename.text.middle, missing.genotype.threshold, filename.text.end, ".012NA")
+  geno<-read.table(genotype.file.name, nrows = num.individuals, colClasses = "integer", col.names = column_names)
+  loci_count <- length(geno[1,]) -1   # because the first column is not a SNP (just a count from zero)
+  # read in individual names for this chromosome dataset
+  individuals.file.name <- paste0(base.name, ".chr", chr, filename.text.middle, missing.genotype.threshold, filename.text.end, ".012.indv")
+  ind<-read.table(individuals.file.name)
+  
+  # Get metadata ----
+  
+  ind_with_locations <- cbind(ind,locations) 
+  print(ind_with_locations)    
+  print("check first two columns to make sure the same")
+  # combine metadata with genotype data
+  combo <- cbind(ind_with_locations[,2:(num_loc_cols+1)],geno[,2:length(geno[1,])])
+  # If need to filter out individuals, based on low read number:
+  filter <- F
+  if (filter==T){
+    # Specify individuals to filter out:
+    combo.NApass.whole.chr <- combo[c(-20,-163),]
+  } else if (1==1) {
+    combo.NApass.whole.chr <- combo
+  }
+  
+  # Get region text ----
+  if (focus.region==F) {
+    position.min <- 1
+    position.max <- pos.whole.chr$position[length(pos.whole.chr$position)]
+    pos <- pos.whole.chr
+    combo.NApass <- combo.NApass.whole.chr
+    region.text <- paste0("Chr",chr,"_whole")
+  } else if (focus.region==T) {
+    selection <- pos.whole.chr$position >= position.min & pos.whole.chr$position <= position.max
+    pos <- pos.whole.chr[selection,]
+    selection <- c(rep(TRUE, times=num_loc_cols), selection)
+    combo.NApass <- combo.NApass.whole.chr[, selection]
+    region.text <- paste0("Chr",chr,"_from_",position.min,"_to_",position.max)
+  }
+  
+  # Make site stats ---- 
+  if (calculate_or_load_stats==1) {
+    # Calculate allele freqs and sample sizes (use column Fst_group)
+    temp.list <- getFreqsAndSampleSizes(combo.NApass, num_loc_cols, groups)
+    freqs <- temp.list$freqs
+    sample_size <- temp.list$sample_size
+    rm(temp.list)
+    print("Calculated population allele frequencies and sample sizes")
+    
+    # calculate nucleotide diversity (pi) at each site for each population
+    #site_pi <- getSitePi(freqs) #for uncorrected pi, biased low at low sample size
+    site_pi_nb <- getSitePi_nb(freqs, sample_size) #corrected pi
+    print("Calculated population pi values")
+    
+    # calculate rownames for pairwise comparisons, for use in Dxy and Fst matrices:
+    # rownames <- getPairwiseNames(groups)   # NOT NEEDED HERE since called from getDxy
+    
+    # calculate Dxy at each site, between pairs of groups
+    Dxy <- getDxy(freqs, groups)
+    print("Calculated Dxy values")
+    
+    # calculate Fst (and numerator and denominator) for each site, 
+    # between pairs of groups (so pops (r) is 2), 
+    # using the Weir&Cockerham 1984 approach to correct for sample size and number of pops
+    temp.list <- getWC84Fst(freqs, sample_size, groups, among=FALSE)  # set among to FALSE if no among Fst wanted (some things won't work without it)
+    WC84_Fst <- temp.list$WC84_Fst
+    WC84_Fst_numerator <- temp.list$WC84_Fst_numerator
+    WC84_Fst_denominator <- temp.list$WC84_Fst_denominator
+    rm(temp.list)
+    print("Calculated WC84_Fst values")
+    
+    if (saveSiteInfo == TRUE) {  # save the per-site stats, if chosen to in Intro section
+      #save(pos, freqs, sample_size, site_pi, WC84_Fst, WC84_Fst_numerator, WC84_Fst_denominator, Dxy, file=paste0(base.name,tag.name,region.text,"_SiteStats_from_R.R")) #uncorrected pi
+      save(pos, freqs, sample_size, site_pi_nb, WC84_Fst, WC84_Fst_numerator, WC84_Fst_denominator, Dxy, file=paste0(base.name,tag.name,region.text,"_SiteStats_from_R.R"))
+      print("Saved summary site stats")
+      WC84_Fst_among <- WC84_Fst[rownames(WC84_Fst)=="Fst_among",]
+      print(paste0(length(WC84_Fst_among)," markers in total (",sum(!is.na(WC84_Fst_among))," variable and ",sum(is.na(WC84_Fst_among)), " invariant)"))
+    } else print("Site stats not saved")
+    
+  } else if (calculate_or_load_stats==2 | calculate_or_load_stats==3) {
+    load(paste0(base.name,tag.name,region.text,"_SiteStats_from_R.R"))
+    print("Loaded saved summary stats")
+  }
+  
+  
+  # Make windowed stats ---- 
+  if (calculate_or_load_stats==1 | calculate_or_load_stats==2) {
+    
+    # calculate windowed pi, in whole windows starting on left side of chromosome
+    #temp.list <- getWindowedPi(site_pi, pos, window_size, step_size) #uncorrected pi
+    temp.list <- getWindowedPi(site_pi_nb, pos, window_size, step_size)
+    rolling.mean.pos.pi <- temp.list$rolling.mean.pos.pi
+    rolling.mean.pi <- temp.list$rolling.mean.pi
+    rm(temp.list)
+    
+    # calculate windowed Dxy, in whole windows starting on left side of chromosome
+    temp.list <- getWindowedDxy(Dxy, pos, window_size, step_size)
+    rolling.mean.pos.Dxy <- temp.list$rolling.mean.pos.Dxy
+    rolling.mean.Dxy <- temp.list$rolling.mean.Dxy
+    rm(temp.list)
+    
+    # calculate windowed Fst according to according to Weir&Cockerham1984 
+    # (with sample size and pop number correction),
+    # calculated as windowed numerator over windowed denominator.
+    temp.list <- getWindowedWC84_Fst(WC84_Fst_numerator, WC84_Fst_denominator, pos, window_size, step_size)
+    rolling.mean.pos.WC84_Fst <- temp.list$rolling.mean.pos.WC84_Fst
+    rolling.mean.WC84_Fst <- temp.list$rolling.mean.WC84_Fst
+    rm(temp.list)
+  }
+  
+  # Save or load ----
+  # save the rolling mean data, if chosen in Intro section
+  if (saveWindowedStats == TRUE) {
+    save(rolling.mean.pos.pi, rolling.mean.pi, rolling.mean.pos.Dxy, rolling.mean.Dxy, rolling.mean.pos.WC84_Fst, rolling.mean.WC84_Fst, file=paste0(base.name,tag.name,region.text,"_window",window_size,"_WindowStats_from_R.R"))
+    print("Saved rolling mean stats")
+  }
+  
+  # load the rolling mean data, if chosen in Intro section:
+  if (load.rolling.means == TRUE) {
+    load(paste0(base.name,tag.name,region.text,"_window",window_size,"_WindowStats_from_R.R"))
+  }
+  
+  # Make plot for chr ----
+  # make ggplots for quick inspection of rolling mean results
+  makeRollingMeanPlots(rolling.mean.pos.WC84_Fst, rolling.mean.WC84_Fst,
+                       rolling.mean.pos.Dxy, rolling.mean.Dxy,
+                       rolling.mean.pos.pi, rolling.mean.pi, 
+                       group.colors.pi, groups.to.plot.pi,
+                       group.colors.Dxy, groups.to.plot.Dxy,
+                       group.colors.WC84_Fst, groups.to.plot.WC84_Fst,
+                       region.text)
+  
+}   
+# End main loop ----
+```
+
+After reading in the data, we can produce a genome scan of Fst, pi_within, and pi_between combining all chromosomes in the genome.
+```R
+
+# GENOME-WIDE plots -------
+# read files for each chromosome, and plot Fst, Dxy, and pi for each chromosome in a single window
+
+# specify groups for plotting, and their colors
+groups.to.plot.WC84_Fst <- c("PAWR_WIWR") #We only have two main populations, so only one Fst scan to plot
+group.colors.WC84_Fst <- c("purple")
+
+groups.to.plot.Dxy <- groups.to.plot.WC84_Fst   # or specify differences if necessary
+group.colors.Dxy <- group.colors.WC84_Fst  # or specify differences if necessary
+groups.to.plot.pi <- c("PAWR", "WIWR") #we have two main populations to plot seperately
+group.colors.pi <- c("blue", "red")
+
+#chromosomes.to.plot <- c("24", "25", "26")   # You can add more if you have processed more above.
+chromosomes.to.plot <- c("1","1A","2","3","4","4A","5","6","7","8","9","10","11","12","13","14","15","17","18","19","20","21","22","23","24","25","26","27","28","Z") #plots all the chromosomes
+max_Dxy_axis <- 0.01  # height of Dxy axis
+max_pi_axis <- 0.01  # height of pi axis
+#transparency <- 0.2  # transparency of the colored area under the lines in 2016 code
+transparency_Fst_Dxy <- 0.4 #2018 code
+transparency_pi <- 0.2 #2018 code
+line_transparency <- 0.8  # transparency of the colored lines
+# plot Genome-wide plot of windowed Fst, Dxy, pi
+plotGenomeFstDxyPi(base.name, tag.name, window_size, chromosomes.to.plot, 
+                   max_Dxy_axis, max_pi_axis, transparency_Fst_Dxy, transparency_pi, line_transparency,
+                   groups.to.plot.WC84_Fst, group.colors.WC84_Fst,
+                   groups.to.plot.Dxy, group.colors.Dxy,
+                   groups.to.plot.pi, group.colors.pi) #Note the newer 2018 version of the script has 2 transparency variables instead of 1, if using 2016 functions only use 1 transparency variable
+``` 
+
+Next, we can produce a figure comparing Fst, pi_between, and pi_within at each genomic window using a scatterplot. First, we compile data from all the autosomes, and then create the plot using this data.
+```R
+# Compile genome-wide info  ----
+# compile windowed WC84_Fst, Dxy, pi for a bunch of chromosomes
+# compile autosomal-genome-wide info:
+chromosomes.to.combine <- c("1","1A","2","3","4","4A","5","6","7","8","9","10","11","12","13","14","15","17","18","19","20","21","22","23","24","25","26","27","28")
+autosome.genome.rolling.stats <- compileWindowedStats(base.name, tag.name, chromosomes.to.combine, window.size)
+
+
+# Dxy_MeanPi plot ----
+# Scatterplot of Dxy vs. mean_pi using compiled genome-wide info .
+# Color the points based on Fst.
+group1 <- "PAWR"
+group2 <- "WIWR"
+max.x <- 0.010   # 0.010 for 1-sample comparison of inor_hume
+# 0.008 for 15-sample comparison of vir_plumb
+max.y <- 0.008   # 0.004 for 1-sample comparison of inor_hume
+# 0.006 for 15-sample comparison of vir_plumb
+cor.method <- "spearman"
+
+group1 <- "PAWR"
+group2 <- "WIWR"
+test_correlation <- plotDxy_MeanPi(group1, group2, cor.method,
+                       autosome.genome.rolling.stats,
+                       max.x, max.y, "grey", "blue")
+test_correlation   # print test of correlation
+```
+
+Next, we can run a boundary analysis to determine whether there is a difference in pi_within/pi_between above and below a given Fst threshold.
+
+```bash
+# Fst boundary analysis ----
+# make a histogram of Fst for one comparison
+# and compare pi and Dxy above and below an Fst cutoff
+group1 <- "WIWR"         
+group2 <- "PAWR" 
+Fst_boundary <- 0.5 #this could be the cutoff for the 5% most differentiated windows (eg, 0.91 for PAWR vs MAWR)
+Fst_boundary_stats <- Fst_hist_and_boundary_stats(group1, group2, 
+                                                  autosome.genome.rolling.stats, 
+                                                  Fst_boundary)
+Fst_boundary_stats  # prints some useful statistics
+```
+
+Next, we can calculate the mean and median values for pi, dxy, and fst for each species/comparison. I will calculate both with and without the Z chromosome, as I am curious to see how it affects the estimate.
+```R
+#I want to know average pi_w, pi_d, and Fst
+
+#PAWR
+mean(rolling.mean.pi[1,]) # Z, 0.00213
+mean(autosome.genome.rolling.stats$pi[1,]) #no Z 0.00264
+median(rolling.mean.pi[1,]) # Z 0.00212
+median(autosome.genome.rolling.stats$pi[1,]) #no Z 0.00261
+
+#WIWR
+mean(rolling.mean.pi[2,]) #0.00303
+mean(autosome.genome.rolling.stats$pi[2,]) #no Z 0.00333
+median(rolling.mean.pi[2,]) #0.00292
+median(autosome.genome.rolling.stats$pi[2,]) #no Z 0.00333
+
+#MAWR
+mean(rolling.mean.pi[4,]) #0.00129
+mean(autosome.genome.rolling.stats$pi[4,]) #no Z 0.00105
+median(rolling.mean.pi[4,]) #0.000541
+median(autosome.genome.rolling.stats$pi[4,]) #no Z 0.000690
+
+#PAWR vs WIWR
+median(rolling.mean.Dxy[1,]) #PAWR WIWR  Z
+median(autosome.genome.rolling.stats$Dxy[1,]) #PAWR WIWR no Z
+mean(rolling.mean.Dxy[1,]) #PAWR WIWR  Z
+mean(autosome.genome.rolling.stats$Dxy[1,]) #PAWRWIWR no Z
+
+median(rolling.mean.WC84_Fst[1,]) #PAWR WIWR  Z
+median(autosome.genome.rolling.stats$WC84_Fst[1,]) #PAWR WIWR no Z
+mean(rolling.mean.WC84_Fst[1,]) #PAWR WIWR  Z
+mean(autosome.genome.rolling.stats$WC84_Fst[1,]) #PAWR WIWR no Z
+
+# PAWR vs MAWR
+median(rolling.mean.Dxy[3,]) #PAWR MAWR
+mean(rolling.mean.Dxy[3,]) #PAWR MAWR
+median(autosome.genome.rolling.stats$Dxy[3,]) #PAWR MAWR no Z
+mean(autosome.genome.rolling.stats$Dxy[3,]) #PAWR MAWR no Z
+
+median(rolling.mean.WC84_Fst[3,]) #PAWR MAWR
+mean(rolling.mean.WC84_Fst[3,]) #PAWR MAWR
+median(autosome.genome.rolling.stats$WC84_Fst[3,]) #PAWR MAWR no Z
+mean(autosome.genome.rolling.stats$WC84_Fst[3,]) #PAWR MAWR no Z
+
+#WIWR vs MAWR
+median(rolling.mean.Dxy[5,]) #WIWR MAWR
+mean(rolling.mean.Dxy[5,]) #WIWR MAWR
+median(autosome.genome.rolling.stats$Dxy[5,]) #MAWR WIWR no Z
+mean(autosome.genome.rolling.stats$Dxy[5,]) #MAWR WIWR no Z
+
+median(rolling.mean.WC84_Fst[5,]) #WIWR MAWR
+mean(rolling.mean.WC84_Fst[5,]) #WIWR MAWR
+median(autosome.genome.rolling.stats$WC84_Fst[5,]) #MAWR WIWR no Z
+mean(autosome.genome.rolling.stats$WC84_Fst[5,]) #MAWR WIWR no Z
+```
