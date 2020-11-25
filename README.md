@@ -1,3 +1,4 @@
+![](https://static.inaturalist.org/photos/64272938/original.jpg?1584917392)
 # Usage Notes
 This repository contains scripts and data required to replicate the analyses.
 
