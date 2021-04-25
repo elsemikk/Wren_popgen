@@ -28,7 +28,7 @@ HS2ST1 is at 9.0 Mb, so get 7-15.7 Mb, however the scaffold is too short, only g
 cat NW_016690192.1[7000000..10516705].flat | grep "/gene" | sed 's/\/gene=//g' | sed 's/"//g' | sed 's/^ *//g' | grep -v "gene_synonym" > Lepidothrix.chr8genes
 #get a list of their locations
 cat NW_016690192.1[7000000..10516705].flat | grep "  gene  " | sed 's/^ *gene *//g' > Lepidothrix.chr8loci
-
+http://127.0.0.1:39419/graphics/plot_zoom_png?width=1200&height=835
 #get a list of genes in this region
 cat NW_016690316.1[1..2590296].flat | grep "/gene" | sed 's/\/gene=//g' | sed 's/"//g' | sed 's/^ *//g' | grep -v "gene_synonym" > Lepidothrix2.chr8genes
 #get a list of their locations

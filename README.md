@@ -3,7 +3,7 @@
 This repository contains scripts and data required to replicate the analyses.
 
 ## Raw Data
-Raw, unprocessed sequencing data is provided in `*.fastq.gz` format un the folder `1_raw_data`. The processed data (012NA genotype files) are in the folder `PAWR_WIWR_012NA_files`. These data include the genotype files with the suffix `.012NA` (contain genotypes for each sample at each position), position files with the suffix `.pos` (listing chromosome name and position for each SNP), and individual files with the suffix `.indv` (listing the sample order of each individual in the dataset).
+Raw, unprocessed sequencing data will be provided in `*.fastq.gz` format in the folder `1_raw_data` in the Dryad repository (these files are too large to be hosted in the Github repostory), and will be deposited to the NCBI SRA (accession numbers to be obtained upon publication). The processed data (012NA genotype files) are in the folder `PAWR_WIWR_012NA_files`. These data include the genotype files with the suffix `.012NA` (contain genotypes for each sample at each position), position files with the suffix `.pos` (listing chromosome name and position for each SNP), and individual files with the suffix `.indv` (listing the sample order of each individual in the dataset).
 
 ## Sample metadata
 Sample metadata are provided in the folder `Sample_information`.

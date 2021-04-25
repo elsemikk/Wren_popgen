@@ -97,5 +97,39 @@ WIWR_het <- heterozygosities %>%
 PAWR_het <- heterozygosities %>%
 	filter(location.group=="PAWR")%>%
 	summarise(mean(heterozygosity))
+```
 
+In order to identify males and females, we can compare heterozygosities on the Z chromosome. 
+
+First, I loaded the data as per the `5_GenomeScans` pipeline, loading the whole dataset (rather than `chromosomes.to.analyze <- c("autoinfSNP")`). Since chromsome Z was listed last in the list of chromosomes, the data for chromosome Z was left in the `geno` variable (with 422,161 sites). I could then run the heterozygosity calculation as above, and make a plot. This plot is provided in the `5_GenomeScans_Plots` folder as `chrZ_heterozygosity.pdf`.
+```R
+#set up an empty vector to hold the data
+heterozygosities <- NULL
+#For each row of genotypes, calculate heterozygosity (the number of "1" genotype calls divided by the total number of non-missing calls for that sample))
+for(i in 1:nrow(geno)){
+  heterozygosities$heterozygosity[i]<- sum(geno[i,]=="1", na.rm=T)/sum(!is.na(geno[i,]))
+}
+heterozygosities$sample <- ind
+heterozygosities$location <- locations
+heterozygosities <- as.data.frame(heterozygosities)
+
+#make another column listing the sample's sex. Conveniently, all females are below 0.008 and the males are above 0.008
+heterozygosities$sex <- "Male"
+heterozygosities$sex[heterozygosities$heterozygosity<0.0008] <- "Female"
+
+#plot the data
+library(dplyr)
+heterozygosities %>%
+filter(location.group != "low_read_WIWR") %>% #remove the failed sample that has (virtually) no data
+  ggplot(., aes(x=sex, y=heterozygosity)) + #create a ggplot
+  theme_classic() + #remove background colour and extra lines
+  theme(axis.text.y = element_text(family="Times", face="plain", colour="black", size=10), axis.text.x = element_text(family="Times", face="plain", colour="black", size=10), axis.title.x = element_text(family="Times", face="plain", colour="black", size=14), axis.title.y = element_text(family="Times", face="plain", colour="black", size=14), legend.text = element_text(family="Times", colour="black", size=10), legend.title = element_text(family="Times", face="plain", colour="black", size=12))+ #define the text fonts and sizes for presentation purposes
+  xlab("Sex")+ #write x axis label
+  ylab("Z Chromosome Heterozygosity")+ #write y axis label
+  labs(colour="Species")+ #make legend label
+  scale_color_manual(values=c("purple", "green", "blue", "red"), labels = c("Hybrid", "Marsh", "Pacific", "Winter")) + #set colours to match population colour scheme
+  geom_boxplot(outlier.size=0) + #I am removing the outlier dots because they are redundant with the jitter plot and can be confused for additional data points
+  geom_jitter(binaxis='y', stackdir='center', dotsize=1, aes(color = location.group)) #plot the data points on top of the boxplot
+
+```
 

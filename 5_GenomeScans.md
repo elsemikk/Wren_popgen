@@ -12,7 +12,7 @@ The first step of this script runs through the data to calculate Fst, pi, and Dx
 
 This script is set to pre-load the data using the line `calculate_or_load_stats <- 3`, this can be changed to re-calculate the stats from the data.
 
-Once complete, this portion will create quick rolling mean plots for each chromosome seperately for inspection.
+Once complete, this portion will create quick rolling mean plots for each chromosome seperately for inspection. I have placed each of these plots into the folder `5_GenomeScans_Plots` for reference.
 
 ```R
 # Introduction ----
@@ -32,7 +32,6 @@ source ("~/Desktop/Wrens/pawr_wiwr_genomics/PAWR_WIWR_genomics_Rproject/Genomics
 #chromosomes.to.analyze <- c("24", "25", "26")  ### I have put just an example of a set of chromosomes here--I have already run these through the main loop below. 
 #### To do them all at once (which would take a long time), use this line:
 chromosomes.to.analyze <- c("1", "1A", "2", "3","4","4A", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15","17","18","19","20","21","22","23","24","25","26","27","28","Z")
-
 
 Analysis_set <- 2  # 1: all samples, only SNPs;    2: all samples, with invariant sites
 
@@ -271,7 +270,7 @@ for (i in 1:length(chromosomes.to.analyze)) {
 # End main loop ----
 ```
 
-After reading in the data, we can produce a genome scan of Fst, pi_within, and pi_between combining all chromosomes in the genome.
+After reading in the data, we can produce a genome scan of Fst, pi_within, and pi_between combining all chromosomes in the genome. This will produce a plot that I have placed into the `5_GenomeScans_Plots` folder: `WC84_Fst_pib_piw_allchromosomes.pdf`
 ```R
 # GENOME-WIDE plots -------
 # read files for each chromosome, and plot Fst, Dxy, and pi for each chromosome in a single window
@@ -301,7 +300,7 @@ plotGenomeFstDxyPi(base.name, tag.name, window_size, chromosomes.to.plot,
                    groups.to.plot.pi, group.colors.pi) #Note the newer 2018 version of the script has 2 transparency variables instead of 1, if using 2016 functions only use 1 transparency variable
 ``` 
 
-Next, we can produce a figure comparing Fst, pi_between, and pi_within at each genomic window using a scatterplot. First, we compile data from all the autosomes, and then create the plot using this data.
+Next, we can produce a figure comparing Fst, pi_between, and pi_within at each genomic window using a scatterplot. We can also test the correlation between pi_w and pi_between First, we compile data from all the autosomes, and then create the plot using this data.
 ```R
 # Compile genome-wide info  ----
 # compile windowed WC84_Fst, Dxy, pi for a bunch of chromosomes
@@ -315,33 +314,269 @@ autosome.genome.rolling.stats <- compileWindowedStats(base.name, tag.name, chrom
 # Color the points based on Fst.
 group1 <- "PAWR"
 group2 <- "WIWR"
-max.x <- 0.010   # 0.010 for 1-sample comparison of inor_hume
-# 0.008 for 15-sample comparison of vir_plumb
-max.y <- 0.008   # 0.004 for 1-sample comparison of inor_hume
-# 0.006 for 15-sample comparison of vir_plumb
+max.x <- 0.010   
+max.y <- 0.010   
 cor.method <- "spearman"
 
 group1 <- "PAWR"
 group2 <- "WIWR"
 test_correlation <- plotDxy_MeanPi(group1, group2, cor.method,
                        autosome.genome.rolling.stats,
-                       max.x, max.y, "grey", "blue")
-test_correlation   # print test of correlation
+                       max.x, max.y, FALSE, c("grey", "blue"))
+test_correlation   # print test of correlation between pi_w and pi_b
+
+#results:
+#	Spearman's rank correlation rho
+#
+#data:  Dxy and mean_pi
+#S = 36040454, p-value < 2.2e-16
+#alternative hypothesis: true rho is not equal to 0
+#sample estimates:
+#    rho 
+#0.86182 
+
+plotFst_MeanPi(group1, group2, cor.method,
+                       autosome.genome.rolling.stats,
+                       0.01, 1, FALSE, c("grey", "blue"))
+plotDxy_Fst(group1, group2, cor.method,
+                       autosome.genome.rolling.stats,
+                       0.01, 1, FALSE, c("grey", "blue"))
+
+plotDxy_MeanPi<- function(group1, group2, cor.method,
+                           autosome.genome.rolling.stats, 
+                           max.x, max.y, color_bar, color_extremes) {
+  groups.for.graph <- paste0(group1, "_", group2)
+  row.choice.1 <- which(rownames(autosome.genome.rolling.stats$pi) == group1)
+  row.choice.2 <- which(rownames(autosome.genome.rolling.stats$pi) == group2)
+  pi_1 <- autosome.genome.rolling.stats$pi[row.choice.1,]
+  pi_2 <- autosome.genome.rolling.stats$pi[row.choice.2,]
+  mean_pi <- (pi_1 + pi_2) / 2
+  Dxy.row.choice <- which(rownames(autosome.genome.rolling.stats$Dxy) == groups.for.graph)
+  Dxy <- as.vector(autosome.genome.rolling.stats$Dxy[Dxy.row.choice,])
+  WC84_Fst.row.choice <- which(rownames(autosome.genome.rolling.stats$WC84_Fst) == groups.for.graph)
+  WC84_Fst.vector <- autosome.genome.rolling.stats$WC84_Fst[WC84_Fst.row.choice,]
+  # color points as a gradient according to WC84_Fst:
+  color.palette <- colorRampPalette(color_extremes)(100)  # makes a color scale with 100 colors
+  max.WC84_Fst <- max(is.finite(WC84_Fst.vector))  # the next line will cause the max.WC84_Fst to be set to the top color
+  color_scale <- (round(WC84_Fst.vector * 100) / max.WC84_Fst)
+  color_scale[color_scale<1] <- 1
+  colors <- color.palette[color_scale]  # makes a list of colors according to Fst values of the windows
+  quartz(title=paste0("Scatterplot of windowed mean pi vs. Dxy between ", group1,"_", group2, sep=""), width=5, height=5.5)
+  plot(x=Dxy, y=mean_pi, col=colors, xlim=c(0,max(c(max(Dxy)*1.04,max.x))), ylim=c(0, max(c(max(mean_pi)*1.04,max.y))),
+       xaxp = c(0, max.x, 2), yaxp=c(0, max.y, 2), pch=19, cex=0.5, cex.axis=0.9, tcl=-0.5, xlab=NA, ylab=NA, mgp=c(3,0.5,0))
+  lines(c(0,1), c(0,1))
+  label.size <- 1.4
+  if (color_bar == T) {
+    colorbar.plot(x=0, y=0.92*max.y, seq(1,100,by=1), col = color.palette, strip.width=0.025, strip.length=0.4, horizontal=T, adj.x = 0, adj.y = 0)
+    text(x=0.22*max.x, y=0.93*max.y, bquote(italic('F')[ST]* " scale"), pos=3, cex=0.8)
+    text(x=0.005*max.x, y=0.925*max.y, "0", pos=1, cex=0.7)
+    text(x=0.415*max.x, y=0.925*max.y, "1", pos=1, cex=0.7)
+  }
+  title(xlab=expression("Between-group differentiation (" * italic(pi)[B] * ")"), line=2.5, cex.lab=label.size)
+  title(ylab=expression("Mean within-group variation (" * italic(pi)[W] * ")"), line=2, cex.lab=label.size)
+  test <- cor.test(Dxy, mean_pi, method=cor.method)
+  return(test)
+}
+plotFst_MeanPi<- function(group1, group2, cor.method,
+                           autosome.genome.rolling.stats, 
+                           max.x, max.y, color_bar, color_extremes) {
+  groups.for.graph <- paste0(group1, "_", group2)
+  row.choice.1 <- which(rownames(autosome.genome.rolling.stats$pi) == group1)
+  row.choice.2 <- which(rownames(autosome.genome.rolling.stats$pi) == group2)
+  pi_1 <- autosome.genome.rolling.stats$pi[row.choice.1,]
+  pi_2 <- autosome.genome.rolling.stats$pi[row.choice.2,]
+  mean_pi <- (pi_1 + pi_2) / 2
+  Dxy.row.choice <- which(rownames(autosome.genome.rolling.stats$Dxy) == groups.for.graph)
+  Dxy <- as.vector(autosome.genome.rolling.stats$Dxy[Dxy.row.choice,])
+  WC84_Fst.row.choice <- which(rownames(autosome.genome.rolling.stats$WC84_Fst) == groups.for.graph)
+  WC84_Fst.vector <- autosome.genome.rolling.stats$WC84_Fst[WC84_Fst.row.choice,]
+  # color points as a gradient according to WC84_Fst:
+  color.palette <- colorRampPalette(color_extremes)(100)  # makes a color scale with 100 colors
+  max.Dxy <- max(is.finite(Dxy))  # the next line will cause the max.WC84_Fst to be set to the top color
+  color_scale <- round(Dxy * 10000)
+  #color_scale[color_scale<1] <- 1
+  colors <- color.palette[color_scale]  # makes a list of colors according to Fst values of the windows
+  quartz(title=paste0("Scatterplot of windowed mean pi vs. Dxy between ", group1,"_", group2, sep=""), width=5, height=5.5)
+  plot(x=mean_pi, y=WC84_Fst.vector, col=colors, xlim=c(0,max(c(max(Dxy)*1.04,max.x))), ylim=c(0, max(c(max(mean_pi)*1.04,max.y))),
+       xaxp = c(0, max.x, 2), yaxp=c(0, max.y, 2), pch=19, cex=0.5, cex.axis=0.9, tcl=-0.5, xlab=NA, ylab=NA, mgp=c(3,0.5,0))
+  label.size <- 1.4
+  if (color_bar == T) {
+    colorbar.plot(x=0, y=0.92*max.y, seq(1,100,by=1), col = color.palette, strip.width=0.025, strip.length=0.4, horizontal=T, adj.x = 0, adj.y = 0)
+    text(x=0.22*max.x, y=0.93*max.y, bquote(italic('F')[ST]* " scale"), pos=3, cex=0.8)
+    text(x=0.005*max.x, y=0.925*max.y, "0", pos=1, cex=0.7)
+    text(x=0.415*max.x, y=0.925*max.y, "1", pos=1, cex=0.7)
+  }
+  title(xlab=expression("Mean within-group variation (" * italic(pi)[W] * ")"), line=2, cex.lab=label.size)
+  title(ylab=expression("Relative Differentiation (" * italic(F)[ST] * ")"), line=2, cex.lab=label.size)
+}
+plotDxy_Fst<- function(group1, group2, cor.method,
+                           autosome.genome.rolling.stats, 
+                           max.x, max.y, color_bar, color_extremes) {
+  groups.for.graph <- paste0(group1, "_", group2)
+  row.choice.1 <- which(rownames(autosome.genome.rolling.stats$pi) == group1)
+  row.choice.2 <- which(rownames(autosome.genome.rolling.stats$pi) == group2)
+  pi_1 <- autosome.genome.rolling.stats$pi[row.choice.1,]
+  pi_2 <- autosome.genome.rolling.stats$pi[row.choice.2,]
+  mean_pi <- (pi_1 + pi_2) / 2
+  Dxy.row.choice <- which(rownames(autosome.genome.rolling.stats$Dxy) == groups.for.graph)
+  Dxy <- as.vector(autosome.genome.rolling.stats$Dxy[Dxy.row.choice,])
+  WC84_Fst.row.choice <- which(rownames(autosome.genome.rolling.stats$WC84_Fst) == groups.for.graph)
+  WC84_Fst.vector <- autosome.genome.rolling.stats$WC84_Fst[WC84_Fst.row.choice,]
+  # color points as a gradient according to WC84_Fst:
+  color.palette <- colorRampPalette(color_extremes)(100)  # makes a color scale with 100 colors
+  color_scale <- round(mean_pi * 10000) # / max.WC84_Fst)
+  #color_scale[color_scale<1] <- 1
+  colors <- color.palette[color_scale]  # makes a list of colors according to Fst values of the windows
+  quartz(title=paste0("Scatterplot of windowed mean pi vs. Dxy between ", group1,"_", group2, sep=""), width=5, height=5.5)
+  plot(x=Dxy, y=WC84_Fst.vector, col=colors, xlim=c(0,max(c(max(Dxy)*1.04,max.x))), ylim=c(0, max(c(max(mean_pi)*1.04,max.y))),
+       xaxp = c(0, max.x, 2), yaxp=c(0, max.y, 2), pch=19, cex=0.5, cex.axis=0.9, tcl=-0.5, xlab=NA, ylab=NA, mgp=c(3,0.5,0))
+  label.size <- 1.4
+  if (color_bar == T) {
+    colorbar.plot(x=0, y=0.92*max.y, seq(1,100,by=1), col = color.palette, strip.width=0.025, strip.length=0.4, horizontal=T, adj.x = 0, adj.y = 0)
+    text(x=0.22*max.x, y=0.93*max.y, bquote(italic('F')[ST]* " scale"), pos=3, cex=0.8)
+    text(x=0.005*max.x, y=0.925*max.y, "0", pos=1, cex=0.7)
+    text(x=0.415*max.x, y=0.925*max.y, "1", pos=1, cex=0.7)
+  }
+  title(xlab=expression("Between-group differentiation (" * italic(pi)[B] * ")"), line=2.5, cex.lab=label.size)
+  title(ylab=expression("Relative Differentiation (" * italic(F)[ST] * ")"), line=2, cex.lab=label.size)
+}
 ```
 
-Next, we can run a boundary analysis to determine whether there is a difference in pi_within/pi_between above and below a given Fst threshold.
+Next, we can run a boundary analysis to determine whether there is a difference in pi_within/pi_between above and below a given Fst threshold. I tested different boundaries in order to identify that Fst value for which 95% of the windows were below the threshold (this turned out to be Fst=0.54) and the Fst value for which 99% f the windows were below the threshold (this turned out to be Fst=0.74).
 
 ```bash
 # Fst boundary analysis ----
 # make a histogram of Fst for one comparison
 # and compare pi and Dxy above and below an Fst cutoff
-group1 <- "WIWR"         
-group2 <- "PAWR" 
-Fst_boundary <- 0.5 #this could be the cutoff for the 5% most differentiated windows (eg, 0.91 for PAWR vs MAWR)
+group1 <- "PAWR"         
+group2 <- "WIWR" 
+Fst_boundary <- 0 #this could be to examine across the whole genome
+#Fst_boundary <- 0.54 #this could be the cutoff for the 5% most differentiated windows (eg, 0.91 for PAWR vs MAWR, 0.54 for WIWR vs PAWR)
+#Fst_boundary <- 0.74 #this could be to examine at the cutoff for the 1% most differentiated windows 
 Fst_boundary_stats <- Fst_hist_and_boundary_stats(group1, group2, 
                                                   autosome.genome.rolling.stats, 
                                                   Fst_boundary)
 Fst_boundary_stats  # prints some useful statistics
+
+#results for boundary= 0.54:
+#$fraction_windows_above_Fst_boundary
+#[1] 0.04995693
+#
+#$mean_Dxy_above_Fst_boundary
+#[1] 0.003654259
+#
+#$mean_Dxy_below_Fst_boundary
+#[1] 0.003932947
+#
+#$mean_pi_above_Fst_boundary
+#[1] 0.001338474
+#
+#$mean_pi_below_Fst_boundary
+#[1] 0.003072358
+
+
+#results for boundary= 0.74:
+#$fraction_windows_above_Fst_boundary
+#[1] 0.01033592
+#
+#$mean_Dxy_above_Fst_boundary
+#[1] 0.00369615
+#
+#$mean_Dxy_below_Fst_boundary
+#[1] 0.003921352
+#
+#$mean_pi_above_Fst_boundary
+#[1] 0.0007852529
+#
+#$mean_pi_below_Fst_boundary
+#[1] 0.00300872
+#
+#$mean_pi_1_above_Fst_boundary
+#[1] 0.0006227417
+#
+#$mean_pi_1_below_Fst_boundary
+#[1] 0.002661776
+#
+#$mean_pi_2_above_Fst_boundary
+#[1] 0.000947764
+#
+#$mean_pi_2_below_Fst_boundary
+#[1] 0.003355663
+
+
+#results for boundary= 0:
+#$fraction_windows_above_Fst_boundary
+#[1] 1
+#
+#$mean_Dxy_above_Fst_boundary
+#[1] 0.003919024
+#
+#$mean_Dxy_below_Fst_boundary
+#[1] NaN
+#
+#$mean_pi_above_Fst_boundary
+#[1] 0.002985738
+#
+#$mean_pi_below_Fst_boundary
+#[1] NaN
+#
+#$mean_pi_1_above_Fst_boundary
+#[1] 0.002640701
+#
+#$mean_pi_1_below_Fst_boundary
+#[1] NaN
+#
+#$mean_pi_2_above_Fst_boundary
+#[1] 0.003330776
+#
+#$mean_pi_2_below_Fst_boundary
+#[1] NaN
+
+
+#Here is the code for the function:
+Fst_hist_and_boundary_stats <- function(group1, group2, 
+                                        autosome.genome.rolling.stats, 
+                                        Fst_boundary) {
+  group.pair <- paste0(group1, "_", group2)
+  quartz(title=paste0("Fst histogram, based on all autosomes, ", group.pair, sep=""), width=8, height=3)
+  Fst.row.choice <- which(rownames(autosome.genome.rolling.stats$WC84_Fst) == group.pair)
+  Fst.vector <- autosome.genome.rolling.stats$WC84_Fst[Fst.row.choice,]
+  hist(Fst.vector)
+  response <- NULL
+  response$fraction_windows_above_Fst_boundary  <- sum(Fst.vector >= Fst_boundary) / length(Fst.vector)
+  
+  quartz(title=paste0("Dxy histogram, based on all autosomes, ", group.pair, sep=""), width=8, height=3)
+  Dxy.row.choice <- which(rownames(autosome.genome.rolling.stats$WC84_Fst) == group.pair)
+  Dxy.vector <- autosome.genome.rolling.stats$Dxy[Dxy.row.choice,]
+  hist(Dxy.vector)
+  response$mean_Dxy_above_Fst_boundary <- mean(Dxy.vector[Fst.vector >= Fst_boundary])
+  response$mean_Dxy_below_Fst_boundary <- mean(Dxy.vector[Fst.vector < Fst_boundary])
+  pi.row.choice.1 <- which(rownames(autosome.genome.rolling.stats$pi) == group1)
+  pi.row.choice.2 <- which(rownames(autosome.genome.rolling.stats$pi) == group2)
+  pi.vector1 <- as.vector(autosome.genome.rolling.stats$pi[pi.row.choice.1,])
+  pi.vector2 <- as.vector(autosome.genome.rolling.stats$pi[pi.row.choice.2,])
+  mean_pi <- (pi.vector1 + pi.vector2) / 2
+  response$mean_pi_above_Fst_boundary <- mean(mean_pi[Fst.vector >= Fst_boundary])
+  response$mean_pi_below_Fst_boundary <- mean(mean_pi[Fst.vector < Fst_boundary])
+  response$mean_pi_1_above_Fst_boundary <- mean(pi.vector1[Fst.vector >= Fst_boundary])
+  response$mean_pi_1_below_Fst_boundary <- mean(pi.vector1[Fst.vector < Fst_boundary])
+  response$mean_pi_2_above_Fst_boundary <- mean(pi.vector2[Fst.vector >= Fst_boundary])
+  response$mean_pi_2_below_Fst_boundary <- mean(pi.vector2[Fst.vector < Fst_boundary])
+  
+  quartz(title=paste0("mean_pi histogram grouped by Fst, based on all autosomes, ", group.pair, sep=""), width=8, height=5)
+  bin_size <- 0.00025
+  tick_label_gap <- 4
+  xrange = seq(0, max(mean_pi)+bin_size, bin_size)
+  hist1 = hist(mean_pi[Fst.vector >= Fst_boundary],breaks=xrange,plot=F)$counts
+  hist2 = hist(mean_pi[Fst.vector < Fst_boundary],breaks=xrange,plot=F)$counts
+  barplot(rbind(hist1,hist2),col=2:4,axes=FALSE,space=0,las=1)
+  at_tick <- seq(0,length(hist1), by=tick_label_gap)
+  tick_label <- at_tick * bin_size
+  axis(side = 2, pos = -0.2, cex.axis=1)  # the y axis
+  axis(side = 1, pos = -0.2, at = at_tick, labels = tick_label, cex.axis=1)
+  
+  return(response)
+}
 ```
 
 Next, we can calculate the mean and median values for pi, dxy, and fst for each species/comparison. I will calculate both with and without the Z chromosome, as I am curious to see how it affects the estimate.
@@ -434,7 +669,8 @@ groups.to.compare <- "PAWR_WIWR"
 WC84_Fst.cutoff <- 0.9 #select a cutoff to display only SNPs above the cut-off
 row.choice <- which(rownames(WC84_Fst) == groups.to.compare)
 selection <- (WC84_Fst[row.choice,] > WC84_Fst.cutoff) & (!is.na(WC84_Fst[row.choice,])) & (pos$position > start.pos) & (pos$position < end.pos) #can define start.pos and end.pos to select a smaller region of the chromosome
-sum(selection) #this is just for one chromosome. 299 for Z.
+sum(selection) #this is just for one chromosome. 
+#result: 299 SNPs on the Z.
 ```
 
 # Fst per chromosome
@@ -595,3 +831,212 @@ for (i in 1:length(chromosomes.to.analyze)) {
 #get Fst results
 meanFst
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```R
+
+# Option to focus on a region of chromosome ----
+focus.region <- T  # choose T for a subset of the chromosome, F for the whole thing)
+if (focus.region==T){
+  position.min <- 0000000
+  position.max <- 3000000
+}
+
+calculate_or_load_stats <- 1  # 1) calculate site stats;  
+# 2) load previously calculated per-site stats; 
+# 3) load per-site and windowed data from file
+
+# Option to save the per-site stats
+saveSiteInfo <- F # TRUE     # TRUE   # If TRUE, will save a file for per-site stats
+
+saveWindowedStats <- F # TRUE     #TRUE   # If TRUE, will save a file for per-window stats
+
+load.rolling.means <- F   #FALSE     #   FALSE    # If TRUE, will load rolling mean data (rather than calculate)
+
+locations <- read.table(paste0(metadata.file), sep = "\t", header=TRUE)
+num_loc_cols <- length(locations[1,])
+
+
+# MAIN LOOP ----
+# -----
+for (i in 1:length(chromosomes.to.analyze)) {
+  chr <- chromosomes.to.analyze[i] 
+  
+  # Get chr data ---- 
+  # read in position data for this chromosome
+  position.file.name <- paste0(base.name, ".chr", chr, filename.text.middle, missing.genotype.threshold, filename.text.end, ".012.pos")
+  pos.whole.chr <- read.table(position.file.name, col.names = c("chrom", "position"))
+  # read in genotype data for this chromosome
+  column_names <- c("null", paste("c", pos.whole.chr$chrom, pos.whole.chr$position, sep="."))
+  genotype.file.name <- paste0(base.name, ".chr", chr, filename.text.middle, missing.genotype.threshold, filename.text.end, ".012NA")
+  geno<-read.table(genotype.file.name, nrows = num.individuals, colClasses = "integer", col.names = column_names)
+  loci_count <- length(geno[1,]) -1   # because the first column is not a SNP (just a count from zero)
+  # read in individual names for this chromosome dataset
+  individuals.file.name <- paste0(base.name, ".chr", chr, filename.text.middle, missing.genotype.threshold, filename.text.end, ".012.indv")
+  ind<-read.table(individuals.file.name)
+  
+  # Get metadata ----
+  
+  ind_with_locations <- cbind(ind,locations) 
+  print(ind_with_locations)    
+  print("check first two columns to make sure the same")
+  # combine metadata with genotype data
+  combo <- cbind(ind_with_locations[,2:(num_loc_cols+1)],geno[,2:length(geno[1,])])
+  # If need to filter out individuals, based on low read number:
+  filter <- F
+  if (filter==T){
+    # Specify individuals to filter out:
+    combo.NApass.whole.chr <- combo[c(-20,-163),]
+  } else if (1==1) {
+    combo.NApass.whole.chr <- combo
+  }
+  
+  # Get region text ----
+  if (focus.region==F) {
+    position.min <- 1
+    position.max <- pos.whole.chr$position[length(pos.whole.chr$position)]
+    pos <- pos.whole.chr
+    combo.NApass <- combo.NApass.whole.chr
+    region.text <- paste0("Chr",chr,"_whole")
+  } else if (focus.region==T) {
+    selection <- pos.whole.chr$position >= position.min & pos.whole.chr$position <= position.max
+    pos <- pos.whole.chr[selection,]
+    selection <- c(rep(TRUE, times=num_loc_cols), selection)
+    combo.NApass <- combo.NApass.whole.chr[, selection]
+    region.text <- paste0("Chr",chr,"_from_",position.min,"_to_",position.max)
+  }
+  
+  # Make site stats ---- 
+  if (calculate_or_load_stats==1) {
+    # Calculate allele freqs and sample sizes (use column Fst_group)
+    temp.list <- getFreqsAndSampleSizes(combo.NApass, num_loc_cols, groups)
+    freqs <- temp.list$freqs
+    sample_size <- temp.list$sample_size
+    rm(temp.list)
+    print("Calculated population allele frequencies and sample sizes")
+    
+    # calculate nucleotide diversity (pi) at each site for each population
+    #site_pi <- getSitePi(freqs) #for uncorrected pi, biased low at low sample size
+    site_pi_nb <- getSitePi_nb(freqs, sample_size) #corrected pi
+    print("Calculated population pi values")
+    
+    # calculate rownames for pairwise comparisons, for use in Dxy and Fst matrices:
+    # rownames <- getPairwiseNames(groups)   # NOT NEEDED HERE since called from getDxy
+    
+    # calculate Dxy at each site, between pairs of groups
+    Dxy <- getDxy(freqs, groups)
+    print("Calculated Dxy values")
+    
+    # calculate Fst (and numerator and denominator) for each site, 
+    # between pairs of groups (so pops (r) is 2), 
+    # using the Weir&Cockerham 1984 approach to correct for sample size and number of pops
+    temp.list <- getWC84Fst(freqs, sample_size, groups, among=FALSE)  # set among to FALSE if no among Fst wanted (some things won't work without it)
+    WC84_Fst <- temp.list$WC84_Fst
+    WC84_Fst_numerator <- temp.list$WC84_Fst_numerator
+    WC84_Fst_denominator <- temp.list$WC84_Fst_denominator
+    rm(temp.list)
+    print("Calculated WC84_Fst values")
+    
+    if (saveSiteInfo == TRUE) {  # save the per-site stats, if chosen to in Intro section
+      #save(pos, freqs, sample_size, site_pi, WC84_Fst, WC84_Fst_numerator, WC84_Fst_denominator, Dxy, file=paste0(base.name,tag.name,region.text,"_SiteStats_from_R.R")) #uncorrected pi
+      save(pos, freqs, sample_size, site_pi_nb, WC84_Fst, WC84_Fst_numerator, WC84_Fst_denominator, Dxy, file=paste0(base.name,tag.name,region.text,"_SiteStats_from_R.R"))
+      print("Saved summary site stats")
+      WC84_Fst_among <- WC84_Fst[rownames(WC84_Fst)=="Fst_among",]
+      print(paste0(length(WC84_Fst_among)," markers in total (",sum(!is.na(WC84_Fst_among))," variable and ",sum(is.na(WC84_Fst_among)), " invariant)"))
+    } else print("Site stats not saved")
+    
+  } else if (calculate_or_load_stats==2 | calculate_or_load_stats==3) {
+    load(paste0(base.name,tag.name,region.text,"_SiteStats_from_R.R"))
+    print("Loaded saved summary stats")
+  }
+  
+  
+  # Make windowed stats ---- 
+  if (calculate_or_load_stats==1 | calculate_or_load_stats==2) {
+    
+    # calculate windowed pi, in whole windows starting on left side of chromosome
+    #temp.list <- getWindowedPi(site_pi, pos, window_size, step_size) #uncorrected pi
+    temp.list <- getWindowedPi(site_pi_nb, pos, window_size, step_size)
+    rolling.mean.pos.pi <- temp.list$rolling.mean.pos.pi
+    rolling.mean.pi <- temp.list$rolling.mean.pi
+    rm(temp.list)
+    
+    # calculate windowed Dxy, in whole windows starting on left side of chromosome
+    temp.list <- getWindowedDxy(Dxy, pos, window_size, step_size)
+    rolling.mean.pos.Dxy <- temp.list$rolling.mean.pos.Dxy
+    rolling.mean.Dxy <- temp.list$rolling.mean.Dxy
+    rm(temp.list)
+    
+    # calculate windowed Fst according to according to Weir&Cockerham1984 
+    # (with sample size and pop number correction),
+    # calculated as windowed numerator over windowed denominator.
+    temp.list <- getWindowedWC84_Fst(WC84_Fst_numerator, WC84_Fst_denominator, pos, window_size, step_size)
+    rolling.mean.pos.WC84_Fst <- temp.list$rolling.mean.pos.WC84_Fst
+    rolling.mean.WC84_Fst <- temp.list$rolling.mean.WC84_Fst
+    rm(temp.list)
+  }
+  
+  # Save or load ----
+  # save the rolling mean data, if chosen in Intro section
+  if (saveWindowedStats == TRUE) {
+    save(rolling.mean.pos.pi, rolling.mean.pi, rolling.mean.pos.Dxy, rolling.mean.Dxy, rolling.mean.pos.WC84_Fst, rolling.mean.WC84_Fst, file=paste0(base.name,tag.name,region.text,"_window",window_size,"_WindowStats_from_R.R"))
+    print("Saved rolling mean stats")
+  }
+  
+  # load the rolling mean data, if chosen in Intro section:
+  if (load.rolling.means == TRUE) {
+    load(paste0(base.name,tag.name,region.text,"_window",window_size,"_WindowStats_from_R.R"))
+  }
+  
+  # Make plot for chr ----
+  # make ggplots for quick inspection of rolling mean results
+  makeRollingMeanPlots(rolling.mean.pos.WC84_Fst, rolling.mean.WC84_Fst,
+                       rolling.mean.pos.Dxy, rolling.mean.Dxy,
+                       rolling.mean.pos.pi, rolling.mean.pi, 
+                       group.colors.pi, groups.to.plot.pi,
+                       group.colors.Dxy, groups.to.plot.Dxy,
+                       group.colors.WC84_Fst, groups.to.plot.WC84_Fst,
+                       region.text)
+  
+}   
+# End main loop ----
+
+
+###This section performs another PCA plot for pacificus vs WIWR PCA#####
+## Make PCA plot ----
+# choose only loci that are variable in the dataset (SNPs), and (optionally) above an Fst threshhold
+# groups and colors determined in Intro section, under groups.to.plot.PCA and group.colors.PCA
+Fst.filter <- F
+Fst.cutoff <- 0.01
+# choose whether to filter by Fst between pair of populations, or by Fst_among (as defined above)
+groups.to.compare <- "Fst_among"
+#groups.to.compare <- "nigrifrons_auduboni"
+axes <- 3
+
+groups.to.plot.PCA <- c("PAWR", "WIWR", "Hybrid")
+group.colors.PCA <- c("blue", "red", "purple")
+
+PCA_results <- plotPCA(Fst.filter, Fst.cutoff, groups.to.compare, WC84_Fst, combo.NApass, num_loc_cols, region.text,
+                       groups.to.plot.PCA, group.colors.PCA, axes, flip1=F, flip2=F)
+
+```
+

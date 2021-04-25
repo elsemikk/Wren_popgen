@@ -561,6 +561,223 @@ PCA_results$scores[,1:3]
 #plot(PCA_results$scores[,1], PCA_results$scores[,3],  asp=1, pch=23, cex=2, xlab="PC1", ylab="PC3")
 ```
 
+Before leaving the question of *T. pacificus salebrosus* and *T. pacificus pacificus*, I would like to see where the most highly differentiated SNP is.
+```R
+# Introduction ----
+# PAWR_WIWR_GBS_R_analysis_script.R
+# Started by Darren Irwin on 5 Feb 2018.
+# Edited for whole SNP set PCA by Else Mikkelsen Oct 8 2018
+# Based on R code written for Greenish Warbler analysis, and then the NA warbler analyses.
+
+# Initial setup ----
+
+# set directory where files stored
+setwd("~/Desktop/Wrens/pawr_wiwr_genomics")
+
+# Load functions
+source ("~/Desktop/Wrens/pawr_wiwr_genomics/PAWR_WIWR_genomics_Rproject/genomics_R_functions.R") #differs from old code at line 205
+
+###Now this code makes a PCA of PAWR pop structure#####
+#it will colour the points by subspecies
+
+chromosomes.to.analyze <- c("20")  
+
+Analysis_set <- 1  # 1: all samples, only SNPs;    2: all samples, with invariant sites
+if (Analysis_set == 1) {
+  # choose path and filename for the 012NA files
+  base.name <- "PAWR_WIWR_012NA_files/PAWR_WIWR.genotypes.SNPs_only"
+  filename.text.middle <- ".max2allele_noindel.maxmiss"
+  # indicate percent threshold for missing genotypes for each SNP--
+  # this was set by earlier filtering, and is just a record-keeper for the filenames:
+  missing.genotype.threshold <- 30 
+  filename.text.end <-".MQ20.lowHet.tab"
+  tag.name <- ".all_chr."   # choose a tag name for this analysis
+  # indicate name of metadata file, a text file with these column headings:
+  # ID  location  group Fst_group plot_order
+  metadata.file <- "PAWRWIWR_Metadata_subspecies.txt"  # Note the first line in this file corrects an error: AD29A07 should be ED29A07
+  num.individuals <- 77  # specify number of individuals in file (good for error checking)
+  # specify window size (number of bp with info) and step size
+  window_size <- 1
+  step_size <- window_size  # could change if wanting overlapping windows
+  # specify groups for calculation of statistics
+  groups <- c("Pacificus", "WIWR", "Hybrid", "Salebrosus")
+  group.colors <- c("blue", "red", "purple", "cadetblue1")
+  group_count <- length(groups)
+  
+  # specify groups for plotting, and their colors
+  groups.to.plot.WC84_Fst <- c("Pacificus_Salebrosus")
+  group.colors.WC84_Fst <- c("blue")
+  groups.to.plot.Dxy <- groups.to.plot.WC84_Fst   # or specify differences if necessary
+  group.colors.Dxy <- group.colors.WC84_Fst  # or specify differences if necessary
+  groups.to.plot.pi <- c("Pacificus", "Salebrosus")
+  group.colors.pi <- c("blue", "cadetblue1")
+  
+}
+
+# Option to focus on a region of chromosome ----
+focus.region <- T  # choose T for a subset of the chromosome, F for the whole thing)
+if (focus.region==T){
+  position.min <- 13700000
+  position.max <- 13900000
+}
+
+calculate_or_load_stats <- 1  # 1) calculate site stats;  
+# 2) load previously calculated per-site stats; 
+# 3) load per-site and windowed data from file
+
+# Option to save the per-site stats
+saveSiteInfo <- F # TRUE     # TRUE   # If TRUE, will save a file for per-site stats
+
+saveWindowedStats <- F # TRUE     #TRUE   # If TRUE, will save a file for per-window stats
+
+load.rolling.means <- F   #FALSE     #   FALSE    # If TRUE, will load rolling mean data (rather than calculate)
+
+
+locations <- read.table(paste0(metadata.file), sep = "\t", header=TRUE)
+num_loc_cols <- length(locations[1,])
+
+for (i in 1:length(chromosomes.to.analyze)) {
+  chr <- chromosomes.to.analyze[i] 
+  
+  # Get chr data ---- 
+  # read in position data for this chromosome
+  position.file.name <- paste0(base.name, ".chr", chr, filename.text.middle, missing.genotype.threshold, filename.text.end, ".012.pos")
+  pos.whole.chr <- read.table(position.file.name, col.names = c("chrom", "position"))
+  # read in genotype data for this chromosome
+  column_names <- c("null", paste("c", pos.whole.chr$chrom, pos.whole.chr$position, sep="."))
+  genotype.file.name <- paste0(base.name, ".chr", chr, filename.text.middle, missing.genotype.threshold, filename.text.end, ".012NA")
+  geno<-read.table(genotype.file.name, nrows = num.individuals, colClasses = "integer", col.names = column_names)
+  loci_count <- length(geno[1,]) -1   # because the first column is not a SNP (just a count from zero)
+  # read in individual names for this chromosome dataset
+  individuals.file.name <- paste0(base.name, ".chr", chr, filename.text.middle, missing.genotype.threshold, filename.text.end, ".012.indv")
+  ind<-read.table(individuals.file.name)
+  
+  # Get metadata ----
+  
+  ind_with_locations <- cbind(ind,locations) 
+  print(ind_with_locations)    
+  print("check first two columns to make sure the same")
+  # combine metadata with genotype data
+  combo <- cbind(ind_with_locations[,2:(num_loc_cols+1)],geno[,2:length(geno[1,])])
+  # If need to filter out individuals, based on low read number:
+  filter <- T
+  if (filter==T){
+    # Specify individuals to filter out:
+    combo.NApass.whole.chr <- combo[c(-20),] #I am filtering this individual out because it is not independant of its close relative
+  } else if (1==1) {
+    combo.NApass.whole.chr <- combo
+  }
+  
+  # Get region text ----
+  if (focus.region==F) {
+    position.min <- 1
+    position.max <- pos.whole.chr$position[length(pos.whole.chr$position)]
+    pos <- pos.whole.chr
+    combo.NApass <- combo.NApass.whole.chr
+    region.text <- paste0("Chr",chr,"_whole")
+  } else if (focus.region==T) {
+    selection <- pos.whole.chr$position >= position.min & pos.whole.chr$position <= position.max
+    pos <- pos.whole.chr[selection,]
+    selection <- c(rep(TRUE, times=num_loc_cols), selection)
+    combo.NApass <- combo.NApass.whole.chr[, selection]
+    region.text <- paste0("Chr",chr,"_from_",position.min,"_to_",position.max)
+  }
+  
+  # Make site stats ---- 
+  if (calculate_or_load_stats==1) {
+    # Calculate allele freqs and sample sizes (use column Fst_group)
+    temp.list <- getFreqsAndSampleSizes(combo.NApass, num_loc_cols, groups)
+    freqs <- temp.list$freqs
+    sample_size <- temp.list$sample_size
+    rm(temp.list)
+    print("Calculated population allele frequencies and sample sizes")
+    
+    # calculate nucleotide diversity (pi) at each site for each population
+    site_pi <- getSitePi(freqs) 
+    print("Calculated population pi values")
+    
+    # calculate rownames for pairwise comparisons, for use in Dxy and Fst matrices:
+    # rownames <- getPairwiseNames(groups)   # NOT NEEDED HERE since called from getDxy
+    
+    # calculate Dxy at each site, between pairs of groups
+    Dxy <- getDxy(freqs, groups)
+    print("Calculated Dxy values")
+    
+    # calculate Fst (and numerator and denominator) for each site, 
+    # between pairs of groups (so pops (r) is 2), 
+    # using the Weir&Cockerham 1984 approach to correct for sample size and number of pops
+    temp.list <- getWC84Fst(freqs, sample_size, groups, among=FALSE)  # set among to FALSE if no among Fst wanted (some things won't work without it)
+    WC84_Fst <- temp.list$WC84_Fst
+    WC84_Fst_numerator <- temp.list$WC84_Fst_numerator
+    WC84_Fst_denominator <- temp.list$WC84_Fst_denominator
+    rm(temp.list)
+    print("Calculated WC84_Fst values")
+    
+    if (saveSiteInfo == TRUE) {  # save the per-site stats, if chosen to in Intro section
+      save(pos, freqs, sample_size, site_pi, WC84_Fst, WC84_Fst_numerator, WC84_Fst_denominator, Dxy, file=paste0(base.name,tag.name,region.text,"_SiteStats_from_R.R"))
+      print("Saved summary site stats")
+      WC84_Fst_among <- WC84_Fst[rownames(WC84_Fst)=="Fst_among",]
+      print(paste0(length(WC84_Fst_among)," markers in total (",sum(!is.na(WC84_Fst_among))," variable and ",sum(is.na(WC84_Fst_among)), " invariant)"))
+    } else print("Site stats not saved")
+    
+  } else if (calculate_or_load_stats==2 | calculate_or_load_stats==3) {
+    load(paste0(base.name,tag.name,region.text,"_SiteStats_from_R.R"))
+    print("Loaded saved summary stats")
+  }
+  
+  # Make windowed stats ---- 
+  if (calculate_or_load_stats==1 | calculate_or_load_stats==2) {
+    
+    # calculate windowed pi, in whole windows starting on left side of chromosome
+    temp.list <- getWindowedPi(site_pi, pos, window_size, step_size)
+    rolling.mean.pos.pi <- temp.list$rolling.mean.pos.pi
+    rolling.mean.pi <- temp.list$rolling.mean.pi
+    rm(temp.list)
+    
+    # calculate windowed Dxy, in whole windows starting on left side of chromosome
+    temp.list <- getWindowedDxy(Dxy, pos, window_size, step_size)
+    rolling.mean.pos.Dxy <- temp.list$rolling.mean.pos.Dxy
+    rolling.mean.Dxy <- temp.list$rolling.mean.Dxy
+    rm(temp.list)
+    
+    # calculate windowed Fst according to according to Weir&Cockerham1984 
+    # (with sample size and pop number correction),
+    # calculated as windowed numerator over windowed denominator.
+    temp.list <- getWindowedWC84_Fst(WC84_Fst_numerator, WC84_Fst_denominator, pos, window_size, step_size)
+    rolling.mean.pos.WC84_Fst <- temp.list$rolling.mean.pos.WC84_Fst
+    rolling.mean.WC84_Fst <- temp.list$rolling.mean.WC84_Fst
+    rm(temp.list)
+  }
+  
+  # Save or load ----
+  # save the rolling mean data, if chosen in Intro section
+  if (saveWindowedStats == TRUE) {
+    save(rolling.mean.pos.pi, rolling.mean.pi, rolling.mean.pos.Dxy, rolling.mean.Dxy, rolling.mean.pos.WC84_Fst, rolling.mean.WC84_Fst, file=paste0(base.name,tag.name,region.text,"_window",window_size,"_WindowStats_from_R.R"))
+    print("Saved rolling mean stats")
+  }
+  
+  # load the rolling mean data, if chosen in Intro section:
+  if (load.rolling.means == TRUE) {
+    load(paste0(base.name,tag.name,region.text,"_window",window_size,"_WindowStats_from_R.R"))
+  }
+  
+  # Make plot for chr ----
+  # make ggplots for quick inspection of rolling mean results
+  makeRollingMeanPlots(rolling.mean.pos.WC84_Fst, rolling.mean.WC84_Fst,
+                       rolling.mean.pos.Dxy, rolling.mean.Dxy,
+                       rolling.mean.pos.pi, rolling.mean.pi, 
+                       group.colors.pi, groups.to.plot.pi,
+                       group.colors.Dxy, groups.to.plot.Dxy,
+                       group.colors.WC84_Fst, groups.to.plot.WC84_Fst,
+                       region.text)
+  
+}   
+# End main loop ----
+
+
+```
+
+
 # PCA of *T. hiemalis* samples
 
 The goal is to determine whether there is any genetic structure amongst the *T. hiemalis* samples: particularly, whether the eastern samples will cluster apart from the western samples. One complication is that three eastern samples are female, and no western samples are female. Including any sex-linked markers would be a problem, as it could introduce a false signal of differentiation between the eastern and western samples. Because of this, it is important to remove the W-linked region mapping to chromosome 8. To be conservative, this script excluded the entirety of chromosome 8. This makes it possible to distinguish population structure from sex differences.
@@ -1014,3 +1231,90 @@ for (i in 1:length(chromosomes.to.analyze)) {
 }   
 # End main loop ----
 ```
+
+Note on missing data:  
+When imputing values for PCA, it is best that the samples do not contain too large a fraction of missing data.  
+Here is how I checked the amount of missing data:  
+
+```bash
+cat PAWR_WIWR.genotypes.SNPs_only.chrautoinfSNP.max2allele_noindel.maxmiss30.MQ20.lowHet.tab.012NA | while read i ; do echo "$i" | grep -o "NA" | wc -l ; done
+```
+Output:
+```
+8101
+13636
+12019
+15846
+8843
+9663
+7648
+10706
+9834
+9572
+8937
+9965
+7773
+9213
+8340
+9828
+9241
+7804
+8004
+12675
+7045
+6388
+7380
+8323
+10180
+9241
+9014
+9082
+9622
+7786
+8186
+7728
+8109
+8134
+7988
+8344
+7831
+8853
+8001
+7411
+6817
+7754
+7238
+7930
+7017
+7629
+9584
+9446
+7261
+6884
+7980
+7580
+9215
+9356
+9045
+7499
+7840
+7393
+8302
+8180
+7677
+7635
+7371
+8455
+10945
+7534
+8874
+8497
+8080
+7677
+8383
+8885
+7156
+8123
+10874
+```
+All but two samples have less than 10% (of total 127,779 sites) missing data, and so SVDimpute should perform well.
