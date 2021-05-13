@@ -1,0 +1,4 @@
+# Windowsize correlations
+
+This folder contains plots produced by an R script provided in the `5_GenomeScans.md` text file.
+The plots are plotted separately for each chromosome and show the correlation between the length of each window (measured using the distances on the Ficedula reference genome) and the Fst, pi_w (within-species sequence diversity), and pi_b (between-species nucleotide diversity). Fst and pib is measured between T. pacificus and T. hiemalis. Each window contains 10,000 genotyped positions, but this encompasses a variable physical distance along the chromosomes due to uneven density of genotyped positions.
