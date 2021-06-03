@@ -679,51 +679,48 @@ sum(selection) #this is just for one chromosome.
 #result: 299 SNPs on the Z.
 ```
 
+# window size correlations
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+It was suggested during review to check whether the statistics (FST, pi_w, or pi_b) are correlated with window size in this dataset. Here is the code I used to check these correlations. This code requires the data to be read into R in the previous step (outlined in the GenomeScans page).
 ```R
-
-# Option to focus on a region of chromosome ----
-focus.region <- T  # choose T for a subset of the chromosome, F for the whole thing)
-if (focus.region==T){
-  position.min <- 0000000
-  position.max <- 3000000
+#First, find the sizes of each of the windows
+getWindowSize <- function(pos, window_size, step_size){
+  rolling.min.pos <- rollapply(pos$position, width=window_size, FUN=min, by=step_size, align="left")
+  rolling.max.pos <- rollapply(pos$position, width=window_size, FUN=max, by=step_size, align="left")
+  rolling.size <- rolling.max.pos - rolling.min.pos
+  return(rolling.size)
 }
+rolling.size <- getWindowSize(pos, window_size, step_size)
 
-calculate_or_load_stats <- 1  # 1) calculate site stats;  
-# 2) load previously calculated per-site stats; 
-# 3) load per-site and windowed data from file
+#after loading the data (from the genome scan analysis), get vectors to hold Fst, dxy, and pi
+mean_WC84_Fst=rolling.mean.WC84_Fst[1,]
+mean_Dxy=rolling.mean.Dxy[1,]
+mean_pi=rolling.mean.pi[1,]
+#plot the relationship between Fst, pi_b (Dxy), and pi_w with window size
+ggplot(as.data.frame(mean_WC84_Fst), aes(x=rolling.size, y=mean_WC84_Fst))+
+  geom_point()+
+  theme_classic()+
+  xlab("Window Size")+
+  ylab("Fst")+
+  stat_smooth(method=lm, aes(x=rolling.size, y=mean_WC84_Fst))
+ggplot(as.data.frame(mean_pi), aes(x=rolling.size, y=mean_pi))+
+  geom_point()+
+  theme_classic()+
+  xlab("Window Size")+
+  ylab("pi_w")+
+  stat_smooth(method=lm, aes(x=rolling.size, y=mean_pi))
+ggplot(as.data.frame(mean_Dxy), aes(x=rolling.size, y=mean_Dxy))+
+  geom_point()+
+  theme_classic()+
+  xlab("Window Size")+
+  ylab("pi_b")+
+  stat_smooth(method=lm, aes(x=rolling.size, y=mean_Dxy))
 
-# Option to save the per-site stats
-saveSiteInfo <- F # TRUE     # TRUE   # If TRUE, will save a file for per-site stats
+#Here is how to loop through each chromosome to make these plots for each one:
+window_size <- 10000
+step_size <- window_size  # could change if wanting overlapping windows
+chromosomes.to.analyze <- c("1", "1A", "2", "3","4","4A", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15","17","18","19","20","21","22","23","24","25","26","27","28","Z")
 
-saveWindowedStats <- F # TRUE     #TRUE   # If TRUE, will save a file for per-window stats
-
-load.rolling.means <- F   #FALSE     #   FALSE    # If TRUE, will load rolling mean data (rather than calculate)
-
-locations <- read.table(paste0(metadata.file), sep = "\t", header=TRUE)
-num_loc_cols <- length(locations[1,])
-
-
-# MAIN LOOP ----
-# -----
 for (i in 1:length(chromosomes.to.analyze)) {
   chr <- chromosomes.to.analyze[i] 
   
@@ -772,118 +769,43 @@ for (i in 1:length(chromosomes.to.analyze)) {
   }
   
   # Make site stats ---- 
-  if (calculate_or_load_stats==1) {
-    # Calculate allele freqs and sample sizes (use column Fst_group)
-    temp.list <- getFreqsAndSampleSizes(combo.NApass, num_loc_cols, groups)
-    freqs <- temp.list$freqs
-    sample_size <- temp.list$sample_size
-    rm(temp.list)
-    print("Calculated population allele frequencies and sample sizes")
-    
-    # calculate nucleotide diversity (pi) at each site for each population
-    #site_pi <- getSitePi(freqs) #for uncorrected pi, biased low at low sample size
-    site_pi_nb <- getSitePi_nb(freqs, sample_size) #corrected pi
-    print("Calculated population pi values")
-    
-    # calculate rownames for pairwise comparisons, for use in Dxy and Fst matrices:
-    # rownames <- getPairwiseNames(groups)   # NOT NEEDED HERE since called from getDxy
-    
-    # calculate Dxy at each site, between pairs of groups
-    Dxy <- getDxy(freqs, groups)
-    print("Calculated Dxy values")
-    
-    # calculate Fst (and numerator and denominator) for each site, 
-    # between pairs of groups (so pops (r) is 2), 
-    # using the Weir&Cockerham 1984 approach to correct for sample size and number of pops
-    temp.list <- getWC84Fst(freqs, sample_size, groups, among=FALSE)  # set among to FALSE if no among Fst wanted (some things won't work without it)
-    WC84_Fst <- temp.list$WC84_Fst
-    WC84_Fst_numerator <- temp.list$WC84_Fst_numerator
-    WC84_Fst_denominator <- temp.list$WC84_Fst_denominator
-    rm(temp.list)
-    print("Calculated WC84_Fst values")
-    
-    if (saveSiteInfo == TRUE) {  # save the per-site stats, if chosen to in Intro section
-      #save(pos, freqs, sample_size, site_pi, WC84_Fst, WC84_Fst_numerator, WC84_Fst_denominator, Dxy, file=paste0(base.name,tag.name,region.text,"_SiteStats_from_R.R")) #uncorrected pi
-      save(pos, freqs, sample_size, site_pi_nb, WC84_Fst, WC84_Fst_numerator, WC84_Fst_denominator, Dxy, file=paste0(base.name,tag.name,region.text,"_SiteStats_from_R.R"))
-      print("Saved summary site stats")
-      WC84_Fst_among <- WC84_Fst[rownames(WC84_Fst)=="Fst_among",]
-      print(paste0(length(WC84_Fst_among)," markers in total (",sum(!is.na(WC84_Fst_among))," variable and ",sum(is.na(WC84_Fst_among)), " invariant)"))
-    } else print("Site stats not saved")
-    
-  } else if (calculate_or_load_stats==2 | calculate_or_load_stats==3) {
-    load(paste0(base.name,tag.name,region.text,"_SiteStats_from_R.R"))
-    print("Loaded saved summary stats")
-  }
+
+  load(paste0(base.name,tag.name,region.text,"_SiteStats_from_R.R"))
+  print("Loaded saved summary stats")
   
-  
-  # Make windowed stats ---- 
-  if (calculate_or_load_stats==1 | calculate_or_load_stats==2) {
-    
-    # calculate windowed pi, in whole windows starting on left side of chromosome
-    #temp.list <- getWindowedPi(site_pi, pos, window_size, step_size) #uncorrected pi
-    temp.list <- getWindowedPi(site_pi_nb, pos, window_size, step_size)
-    rolling.mean.pos.pi <- temp.list$rolling.mean.pos.pi
-    rolling.mean.pi <- temp.list$rolling.mean.pi
-    rm(temp.list)
-    
-    # calculate windowed Dxy, in whole windows starting on left side of chromosome
-    temp.list <- getWindowedDxy(Dxy, pos, window_size, step_size)
-    rolling.mean.pos.Dxy <- temp.list$rolling.mean.pos.Dxy
-    rolling.mean.Dxy <- temp.list$rolling.mean.Dxy
-    rm(temp.list)
-    
-    # calculate windowed Fst according to according to Weir&Cockerham1984 
-    # (with sample size and pop number correction),
-    # calculated as windowed numerator over windowed denominator.
-    temp.list <- getWindowedWC84_Fst(WC84_Fst_numerator, WC84_Fst_denominator, pos, window_size, step_size)
-    rolling.mean.pos.WC84_Fst <- temp.list$rolling.mean.pos.WC84_Fst
-    rolling.mean.WC84_Fst <- temp.list$rolling.mean.WC84_Fst
-    rm(temp.list)
-  }
-  
-  # Save or load ----
-  # save the rolling mean data, if chosen in Intro section
-  if (saveWindowedStats == TRUE) {
-    save(rolling.mean.pos.pi, rolling.mean.pi, rolling.mean.pos.Dxy, rolling.mean.Dxy, rolling.mean.pos.WC84_Fst, rolling.mean.WC84_Fst, file=paste0(base.name,tag.name,region.text,"_window",window_size,"_WindowStats_from_R.R"))
-    print("Saved rolling mean stats")
-  }
-  
-  # load the rolling mean data, if chosen in Intro section:
-  if (load.rolling.means == TRUE) {
-    load(paste0(base.name,tag.name,region.text,"_window",window_size,"_WindowStats_from_R.R"))
-  }
-  
+  load(paste0(base.name,tag.name,region.text,"_window",window_size,"_WindowStats_from_R.R"))
+   
   # Make plot for chr ----
   # make ggplots for quick inspection of rolling mean results
-  makeRollingMeanPlots(rolling.mean.pos.WC84_Fst, rolling.mean.WC84_Fst,
-                       rolling.mean.pos.Dxy, rolling.mean.Dxy,
-                       rolling.mean.pos.pi, rolling.mean.pi, 
-                       group.colors.pi, groups.to.plot.pi,
-                       group.colors.Dxy, groups.to.plot.Dxy,
-                       group.colors.WC84_Fst, groups.to.plot.WC84_Fst,
-                       region.text)
-  
-}   
-# End main loop ----
+  rolling.size <- getWindowSize(pos, window_size, step_size)
 
+  mean_WC84_Fst=rolling.mean.WC84_Fst[1,]
+  mean_Dxy=rolling.mean.Dxy[1,]
+  mean_pi=rolling.mean.pi[1,]
+  quartz()
+  print(ggplot(as.data.frame(mean_WC84_Fst), aes(x=rolling.size, y=mean_WC84_Fst))+
+    geom_point()+
+    theme_classic()+
+    xlab("Window Size")+
+    ylab("Fst")+
+    stat_smooth(method=lm, aes(x=rolling.size, y=mean_WC84_Fst)))
 
-###This section performs another PCA plot for pacificus vs WIWR PCA#####
-## Make PCA plot ----
-# choose only loci that are variable in the dataset (SNPs), and (optionally) above an Fst threshhold
-# groups and colors determined in Intro section, under groups.to.plot.PCA and group.colors.PCA
-Fst.filter <- F
-Fst.cutoff <- 0.01
-# choose whether to filter by Fst between pair of populations, or by Fst_among (as defined above)
-groups.to.compare <- "Fst_among"
-#groups.to.compare <- "nigrifrons_auduboni"
-axes <- 3
+  quartz()
+  print(ggplot(as.data.frame(mean_pi), aes(x=rolling.size, y=mean_pi))+
+    geom_point()+
+    theme_classic()+
+    xlab("Window Size")+
+    ylab("pi_w")+
+    stat_smooth(method=lm, aes(x=rolling.size, y=mean_pi)))
 
-groups.to.plot.PCA <- c("PAWR", "WIWR", "Hybrid")
-group.colors.PCA <- c("blue", "red", "purple")
-
-PCA_results <- plotPCA(Fst.filter, Fst.cutoff, groups.to.compare, WC84_Fst, combo.NApass, num_loc_cols, region.text,
-                       groups.to.plot.PCA, group.colors.PCA, axes, flip1=F, flip2=F)
-
+  quartz()
+  print(ggplot(as.data.frame(mean_Dxy), aes(x=rolling.size, y=mean_Dxy))+
+    geom_point()+
+    theme_classic()+
+    xlab("Window Size")+
+    ylab("pi_b")+
+    stat_smooth(method=lm, aes(x=rolling.size, y=mean_Dxy)))
+} 
 ```
 
-
+I have placed the resulting plots into this repository, into the folder `5_GenomeScans_Plots/Windowsize_correlations`.

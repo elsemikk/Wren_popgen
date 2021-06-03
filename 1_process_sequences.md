@@ -3,7 +3,7 @@
 This page details the bioinformatics pipeline used to obtain the genotype dataset from the raw GBS sequencing data. This includes demultiplexing and trimming the sequences, mapping to the reference genome, calling genotypes, and filtering the SNP dataset.  
 
 **Input**: raw `.fastq` files with sequencing data for all individuals  
-**Output**: `*.012NA`, `*.indv`, and `*.pos` files containing the genotype data for all samples
+**Output**: `*.012NA`, `*.indv`, and `*.pos` files containing the genotype data for all samples. Note that these files are provided in this repository in the folder `PAWR_WIWR_012NA_files`.
 
 # Step 1: Demultiplex the data
 

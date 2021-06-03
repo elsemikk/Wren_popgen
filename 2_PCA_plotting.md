@@ -6,7 +6,7 @@ This file contains the code which was used to produce the PCA figures shown in t
 
 **Output:**: PCA figures and PCA data
 
-Note that the R code provided here will require a few changes before it can be run on a different machine: changing the path to the working directory, source function file, and input data files.
+Note that the R code, provided here, as well as other R code in this repository, will require a few changes before it can be run on a different machine: changing the path to the working directory, source function file, and input data files.
 
 # PCA of whole genome data
 
