@@ -5,7 +5,7 @@ This repository contains scripts and data required to replicate the analyses fro
 The repository is organized into a series of markdown files that provide instructions for running analyses, and folders that contain raw data or intermediate files produced during analyses.
 
 ## Raw Data
-Raw, unprocessed sequencing data is available through the NCBI SRA (these files are too large to be hosted in the repostory). The processed data (012NA genotype files) are in the folder `PAWR_WIWR_012NA_files`. These data include the genotype files with the suffix `.012NA` (contain genotypes for each sample at each position), position files with the suffix `.pos` (listing chromosome name and position for each SNP), and individual files with the suffix `.indv` (listing the sample order of each individual in the dataset).
+Raw, unprocessed sequencing data is available through the NCBI SRA, within BioProject PRJNA735026 (these files are too large to be hosted in the repostory). The processed data (012NA genotype files) are in the folder `PAWR_WIWR_012NA_files`. These data include the genotype files with the suffix `.012NA` (contain genotypes for each sample at each position), position files with the suffix `.pos` (listing chromosome name and position for each SNP), and individual files with the suffix `.indv` (listing the sample order of each individual in the dataset).
 
 ## Sample metadata
 Sample metadata are provided in the folder `Sample_information`.
